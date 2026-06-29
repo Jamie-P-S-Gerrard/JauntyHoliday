@@ -56,7 +56,7 @@ export function AppShell() {
         )}
 
         {/* Main content */}
-        <div className={inTrip ? 'app-main' : undefined}>
+        <div className="app-main">
           {stage === 'login' && (
             <LoginScreen onLogin={() => setStage('groups')} />
           )}

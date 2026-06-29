@@ -395,17 +395,6 @@ html, body {
     flex-direction: row;
   }
 
-  /* Main content area right of sidebar */
-  .app-main {
-    flex: 1;
-    min-width: 0;
-    height: 100%;
-    overflow: hidden;
-    position: relative;
-    display: flex;
-    flex-direction: column;
-  }
-
   /* Hide bottom tab bar on tablet */
   .tabbar { display: none; }
 
@@ -472,17 +461,26 @@ html, body {
   }
 }
 
-/* Mobile: sidebar hidden, app-main is transparent wrapper */
+/* app-main base — works at all breakpoints */
+.app-main {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Mobile: hide sidebar */
 @media (max-width: 767px) {
   .sidebar { display: none; }
-  .app-main {
-    height: 100%;
-    display: flex;
-    flex-direction: column;
+}
+
+/* Tablet trip: app-main fills remaining width beside sidebar */
+@media (min-width: 768px) {
+  .app-frame--trip > .app-main {
     flex: 1;
     min-width: 0;
-    overflow: hidden;
-    position: relative;
+    height: 100%;
   }
 }
 
