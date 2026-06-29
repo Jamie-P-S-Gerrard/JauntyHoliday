@@ -351,8 +351,17 @@ html, body {
 .input::placeholder { color: var(--ink-faint); }
 .input:focus { border-color: var(--terra); }
 
-/* ─── App frame (mobile shell) ────────────────────────────────── */
+/* ─── App host + frame ────────────────────────────────────────── */
 
+.app-host {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-2);
+}
+
+/* Phone frame (login / groups / setup) */
 .app-frame {
   width: 100%;
   max-width: 430px;
@@ -366,6 +375,115 @@ html, body {
 }
 @media (min-width: 481px) {
   .app-frame { border-radius: 48px; }
+}
+
+/* ─── Tablet layout (trip stage) ──────────────────────────────── */
+
+@media (min-width: 768px) {
+  .app-host--trip {
+    background: var(--bg);
+    align-items: stretch;
+    justify-content: stretch;
+  }
+
+  .app-frame--trip {
+    max-width: 100%;
+    max-height: 100%;
+    border-radius: 0;
+    box-shadow: none;
+    display: flex;
+    flex-direction: row;
+  }
+
+  /* Main content area right of sidebar */
+  .app-main {
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Hide bottom tab bar on tablet */
+  .tabbar { display: none; }
+
+  /* ── Sidebar ─────────────────────────────────────────────────── */
+
+  .sidebar {
+    display: flex;
+    flex-direction: column;
+    width: 240px;
+    min-width: 240px;
+    height: 100%;
+    background: var(--surface);
+    border-right: 1px solid var(--line-2);
+    padding: 28px 12px 24px;
+    flex-shrink: 0;
+  }
+
+  .sidebar-logo {
+    padding: 0 12px;
+    margin-bottom: 22px;
+  }
+
+  .sidebar-group-btn {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 9px 12px;
+    background: var(--surface-2);
+    border: 1px solid var(--line-2);
+    border-radius: 10px;
+    margin-bottom: 20px;
+    cursor: pointer;
+    width: 100%;
+    text-align: left;
+  }
+
+  .sidebar-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 11px 12px;
+    border-radius: 10px;
+    font-size: 14.5px;
+    font-weight: 500;
+    color: var(--ink-soft);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    width: 100%;
+    transition: background 0.15s, color 0.15s;
+    text-align: left;
+  }
+
+  .sidebar-item:hover {
+    background: var(--surface-2);
+    color: var(--ink);
+  }
+
+  .sidebar-item.active {
+    background: var(--terra-bg);
+    color: var(--terra-ink);
+    font-weight: 600;
+  }
+}
+
+/* Mobile: sidebar hidden, app-main is transparent wrapper */
+@media (max-width: 767px) {
+  .sidebar { display: none; }
+  .app-main {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    position: relative;
+  }
 }
 
 /* ─── Screen layout helpers ───────────────────────────────────── */

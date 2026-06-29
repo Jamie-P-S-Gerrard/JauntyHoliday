@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { TabBar } from './ui/TabBar';
+import { Sidebar } from './ui/Sidebar';
 import { LoginScreen } from './screens/LoginScreen';
 import { GroupsScreen } from './screens/GroupsScreen';
 import { SetupScreen } from './screens/SetupScreen';
@@ -38,50 +39,66 @@ export function AppShell() {
 
   const activeGroup = active ?? groups[0];
 
+  const inTrip = stage === 'trip';
+
   return (
-    <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-2)' }}>
-      {/* Mobile-width container */}
-      <div className="app-frame">
-        {stage === 'login' && (
-          <LoginScreen onLogin={() => setStage('groups')} />
-        )}
+    <div className={`app-host${inTrip ? ' app-host--trip' : ''}`}>
+      <div className={`app-frame${inTrip ? ' app-frame--trip' : ''}`}>
 
-        {stage === 'groups' && (
-          <GroupsScreen
-            groups={groups}
-            userId={userId}
-            onOpen={openGroup}
-            onCreate={createGroup}
-            onSignOut={() => setStage('login')}
+        {/* Sidebar — tablet only, trip stage only */}
+        {inTrip && (
+          <Sidebar
+            active={tab}
+            onChange={setTab}
+            groupName={activeGroup?.name ?? ''}
+            onSwitchGroup={() => setStage('groups')}
           />
         )}
 
-        {stage === 'setup' && activeGroup && (
-          <SetupScreen
-            group={activeGroup}
-            onBack={() => setStage('groups')}
-          />
-        )}
+        {/* Main content */}
+        <div className={inTrip ? 'app-main' : undefined}>
+          {stage === 'login' && (
+            <LoginScreen onLogin={() => setStage('groups')} />
+          )}
 
-        {stage === 'trip' && (
-          <>
-            {tab === 'home' && (
-              <HomeScreen
-                groupName={activeGroup?.name ?? ''}
-                onSwitch={() => setStage('groups')}
-                go={setTab}
-              />
-            )}
-            {tab === 'dates'    && <DatesScreen />}
-            {tab === 'discover' && (
-              <DiscoverScreen saved={saved} onSave={toggleSave} onAdd={addToPlan} />
-            )}
-            {tab === 'plan'   && <PlanScreen saved={saved} />}
-            {tab === 'budget' && <BudgetScreen />}
+          {stage === 'groups' && (
+            <GroupsScreen
+              groups={groups}
+              userId={userId}
+              onOpen={openGroup}
+              onCreate={createGroup}
+              onSignOut={() => setStage('login')}
+            />
+          )}
 
-            <TabBar active={tab} onChange={setTab} />
-          </>
-        )}
+          {stage === 'setup' && activeGroup && (
+            <SetupScreen
+              group={activeGroup}
+              onBack={() => setStage('groups')}
+            />
+          )}
+
+          {inTrip && (
+            <>
+              {tab === 'home' && (
+                <HomeScreen
+                  groupName={activeGroup?.name ?? ''}
+                  onSwitch={() => setStage('groups')}
+                  go={setTab}
+                />
+              )}
+              {tab === 'dates'    && <DatesScreen />}
+              {tab === 'discover' && (
+                <DiscoverScreen saved={saved} onSave={toggleSave} onAdd={addToPlan} />
+              )}
+              {tab === 'plan'   && <PlanScreen saved={saved} />}
+              {tab === 'budget' && <BudgetScreen />}
+
+              {/* TabBar — mobile only (hidden on tablet via CSS) */}
+              <TabBar active={tab} onChange={setTab} />
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
