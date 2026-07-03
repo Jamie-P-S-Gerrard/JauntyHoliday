@@ -1,10 +1,12 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Wordmark } from '@/components/ui/Wordmark';
 import { Placeholder } from '@/components/ui/Placeholder';
+import { createClient } from '@/lib/supabase/client';
+import { supabaseConfigured } from '@/lib/supabase/configured';
 
 interface LoginScreenProps {
-  onLogin: () => void;
+  onDemoLogin: () => void;
 }
 
 function GoogleG() {
@@ -28,12 +30,62 @@ function AppleMark() {
 
 type Provider = 'google' | 'apple' | 'email';
 
-export function LoginScreen({ onLogin }: LoginScreenProps) {
+export function LoginScreen({ onDemoLogin }: LoginScreenProps) {
   const [loading, setLoading] = useState<Provider | null>(null);
+  const [emailOpen, setEmailOpen] = useState(false);
+  const [email, setEmail] = useState('');
+  const [linkSent, setLinkSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleLogin = (provider: Provider) => {
+  const configured = supabaseConfigured();
+
+  // Surface errors passed back from /auth/callback (?auth_error=...)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const authError = params.get('auth_error');
+    if (authError) {
+      setError(authError);
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+  }, []);
+
+  const handleOAuth = async (provider: 'google' | 'apple') => {
+    setError(null);
     setLoading(provider);
-    setTimeout(() => { setLoading(null); onLogin(); }, 950);
+    if (!configured) {
+      // Demo mode — no Supabase env vars, keep the old fake sign-in
+      setTimeout(() => { setLoading(null); onDemoLogin(); }, 950);
+      return;
+    }
+    const supabase = createClient();
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: { redirectTo: `${window.location.origin}/auth/callback` },
+    });
+    // On success the browser navigates away; we only get here on failure
+    if (error) {
+      setError(error.message);
+      setLoading(null);
+    }
+  };
+
+  const handleEmail = async () => {
+    if (!emailOpen) { setEmailOpen(true); return; }
+    if (!email.trim() || !email.includes('@')) return;
+    setError(null);
+    setLoading('email');
+    if (!configured) {
+      setTimeout(() => { setLoading(null); onDemoLogin(); }, 950);
+      return;
+    }
+    const supabase = createClient();
+    const { error } = await supabase.auth.signInWithOtp({
+      email: email.trim(),
+      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+    });
+    setLoading(null);
+    if (error) setError(error.message);
+    else setLinkSent(true);
   };
 
   return (
@@ -74,38 +126,80 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
         borderRadius: '28px 28px 0 0',
         padding: '28px 24px 48px',
       }}>
-        <ProviderBtn
-          label="Continue with Google"
-          icon={<GoogleG />}
-          dark={false}
-          loading={loading === 'google'}
-          onClick={() => handleLogin('google')}
-        />
-        <ProviderBtn
-          label="Continue with Apple"
-          icon={<AppleMark />}
-          dark={true}
-          loading={loading === 'apple'}
-          onClick={() => handleLogin('apple')}
-          style={{ marginTop: 10 }}
-        />
+        {linkSent ? (
+          <div style={{ textAlign: 'center', padding: '12px 0 24px' }}>
+            <h2 className="sec-title" style={{ marginBottom: 8 }}>Check your email</h2>
+            <p className="hdr-sub" style={{ lineHeight: 1.5 }}>
+              We sent a sign-in link to <strong>{email}</strong>.<br />
+              Open it on this device to continue.
+            </p>
+            <button
+              className="btn ghost sm"
+              style={{ marginTop: 18 }}
+              onClick={() => { setLinkSent(false); setEmailOpen(false); }}
+            >
+              Use a different method
+            </button>
+          </div>
+        ) : (
+          <>
+            <ProviderBtn
+              label="Continue with Google"
+              icon={<GoogleG />}
+              dark={false}
+              loading={loading === 'google'}
+              onClick={() => handleOAuth('google')}
+            />
+            <ProviderBtn
+              label="Continue with Apple"
+              icon={<AppleMark />}
+              dark={true}
+              loading={loading === 'apple'}
+              onClick={() => handleOAuth('apple')}
+              style={{ marginTop: 10 }}
+            />
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '16px 0' }}>
-          <div style={{ flex: 1, height: 1, background: 'var(--line)' }} />
-          <span style={{ fontSize: 12, color: 'var(--ink-faint)', fontWeight: 600 }}>OR</span>
-          <div style={{ flex: 1, height: 1, background: 'var(--line)' }} />
-        </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '16px 0' }}>
+              <div style={{ flex: 1, height: 1, background: 'var(--line)' }} />
+              <span style={{ fontSize: 12, color: 'var(--ink-faint)', fontWeight: 600 }}>OR</span>
+              <div style={{ flex: 1, height: 1, background: 'var(--line)' }} />
+            </div>
 
-        <ProviderBtn
-          label="Continue with email"
-          dark={false}
-          loading={loading === 'email'}
-          onClick={() => handleLogin('email')}
-        />
+            {emailOpen && (
+              <input
+                className="input"
+                type="email"
+                placeholder="you@email.com"
+                value={email}
+                autoFocus
+                onChange={(e) => setEmail(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleEmail()}
+                style={{ marginBottom: 10 }}
+              />
+            )}
+            <ProviderBtn
+              label={emailOpen ? 'Send sign-in link' : 'Continue with email'}
+              dark={false}
+              loading={loading === 'email'}
+              onClick={handleEmail}
+            />
 
-        <p style={{ textAlign: 'center', fontSize: 11.5, color: 'var(--ink-faint)', marginTop: 20, lineHeight: 1.5 }}>
-          By continuing you agree to our Terms of Service and Privacy Policy.
-        </p>
+            {error && (
+              <p style={{ textAlign: 'center', fontSize: 12.5, color: 'var(--terra)', marginTop: 12 }}>
+                {error}
+              </p>
+            )}
+            {!configured && (
+              <p style={{ textAlign: 'center', fontSize: 11.5, color: 'var(--ink-faint)', marginTop: 12 }}>
+                Demo mode — Supabase is not configured, sign-in is simulated.
+              </p>
+            )}
+
+            <p style={{ textAlign: 'center', fontSize: 11.5, color: 'var(--ink-faint)', marginTop: 20, lineHeight: 1.5 }}>
+              By continuing you agree to our Terms of Service and Privacy Policy.
+            </p>
+          </>
+        )}
       </div>
     </div>
   );

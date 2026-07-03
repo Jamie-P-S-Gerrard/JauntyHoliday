@@ -1,10 +1,9 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { NextRequest } from 'next/server';
+import { demoDiscoverReply } from '@/lib/discover-demo';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-
-const client = new Anthropic();
 
 const SYSTEM = `You are a warm, knowledgeable travel assistant inside Jaunt, a trip-planning app.
 
@@ -43,6 +42,15 @@ export async function POST(req: NextRequest) {
   if (!query?.trim()) {
     return Response.json({ error: 'query is required' }, { status: 400 });
   }
+
+  // Demo mode — no Anthropic key configured. Serve canned replies so the
+  // Discover UI is fully testable offline.
+  if (!process.env.ANTHROPIC_API_KEY) {
+    await new Promise((r) => setTimeout(r, 400)); // brief "thinking" pause
+    return Response.json(demoDiscoverReply(query));
+  }
+
+  const client = new Anthropic();
 
   // Build message list: history (prior turns) + current user query
   const messages: Anthropic.MessageParam[] = [

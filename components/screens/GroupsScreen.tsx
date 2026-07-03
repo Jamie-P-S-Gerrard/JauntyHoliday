@@ -11,12 +11,13 @@ import type { Group } from '@/types';
 interface GroupsScreenProps {
   groups: Group[];
   userId: string;
+  userName?: string;
   onOpen: (g: Group) => void;
   onCreate: (g: Group) => void;
   onSignOut: () => void;
 }
 
-export function GroupsScreen({ groups, userId, onOpen, onCreate, onSignOut }: GroupsScreenProps) {
+export function GroupsScreen({ groups, userId, userName, onOpen, onCreate, onSignOut }: GroupsScreenProps) {
   const [createOpen, setCreateOpen] = useState(false);
   const [joinOpen, setJoinOpen] = useState(false);
 
@@ -33,7 +34,7 @@ export function GroupsScreen({ groups, userId, onOpen, onCreate, onSignOut }: Gr
       {/* Greeting */}
       <div style={{ padding: '4px var(--pad) 20px' }}>
         <h1 className="hdr-title" style={{ fontSize: 28 }}>
-          Hi {USER_NAMES[userId] ?? userId} —{' '}
+          Hi {userName ?? USER_NAMES[userId] ?? userId} —{' '}
           <em>where to next?</em>
         </h1>
       </div>

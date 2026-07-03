@@ -1,33 +1,44 @@
 'use client';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Wordmark } from '@/components/ui/Wordmark';
 import { AvatarStack } from '@/components/ui/Avatar';
 import { Icon } from '@/components/ui/Icon';
 import { Placeholder } from '@/components/ui/Placeholder';
-import type { Group } from '@/types';
+import type { AppTab, Group } from '@/types';
 
-const STEPS = [
-  { id: 'dates',     label: 'Confirm the dates',          icon: 'calendar' },
-  { id: 'invite',    label: 'Invite your crew',            icon: 'users' },
-  { id: 'discover',  label: 'Find places with AI',         icon: 'sparkles' },
-  { id: 'itinerary', label: 'Build the itinerary',         icon: 'route' },
+const STEPS: Array<{ id: string; label: string; sub: string; icon: string; tab: AppTab | null }> = [
+  { id: 'dates',     label: 'Confirm the dates',   sub: 'Propose options and vote',      icon: 'calendar', tab: 'dates' },
+  { id: 'invite',    label: 'Invite your crew',    sub: 'Share the code below',          icon: 'users',    tab: null },
+  { id: 'discover',  label: 'Find places with AI', sub: 'Ask the trip assistant',        icon: 'sparkles', tab: 'discover' },
+  { id: 'itinerary', label: 'Build the itinerary', sub: 'Plan it day by day',            icon: 'route',    tab: 'plan' },
 ];
 
 interface SetupScreenProps {
   group: Group;
   onBack: () => void;
+  onGo: (tab: AppTab) => void;
 }
 
-export function SetupScreen({ group, onBack }: SetupScreenProps) {
-  const [done, setDone] = useState<Record<string, boolean>>({});
+export function SetupScreen({ group, onBack, onGo }: SetupScreenProps) {
   const [copied, setCopied] = useState(false);
-
-  const toggle = (id: string) => setDone((p) => ({ ...p, [id]: !p[id] }));
+  const [codePulse, setCodePulse] = useState(false);
+  const codeRef = useRef<HTMLDivElement>(null);
 
   const copyCode = () => {
     navigator.clipboard.writeText(group.inviteCode).catch(() => {});
     setCopied(true);
     setTimeout(() => setCopied(false), 1600);
+  };
+
+  const handleStep = (step: (typeof STEPS)[number]) => {
+    if (step.tab) {
+      onGo(step.tab);
+      return;
+    }
+    // Invite step — draw the eye to the code card below
+    codeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setCodePulse(true);
+    setTimeout(() => setCodePulse(false), 1400);
   };
 
   return (
@@ -62,34 +73,25 @@ export function SetupScreen({ group, onBack }: SetupScreenProps) {
       <div className="scroll-area" style={{ padding: '0 var(--pad)' }}>
         {/* First steps */}
         <p className="eyebrow" style={{ marginBottom: 12 }}>First steps</p>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 24 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }}>
           {STEPS.map((step) => (
             <button
               key={step.id}
               className="card"
               style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px var(--cardpad)', textAlign: 'left' }}
-              onClick={() => toggle(step.id)}
+              onClick={() => handleStep(step)}
             >
               <div style={{
                 width: 40, height: 40, borderRadius: 12,
-                background: done[step.id] ? 'var(--olive-bg)' : 'var(--surface-2)',
+                background: 'var(--surface-2)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                position: 'relative',
               }}>
-                <Icon name={step.icon} size={20} color={done[step.id] ? 'var(--olive)' : 'var(--ink-soft)'} />
-                {done[step.id] && (
-                  <div style={{
-                    position: 'absolute', top: -4, right: -4, width: 16, height: 16,
-                    borderRadius: '50%', background: 'var(--olive)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}>
-                    <Icon name="check" size={10} color="#fff" strokeWidth={3} />
-                  </div>
-                )}
+                <Icon name={step.icon} size={20} color="var(--ink-soft)" />
               </div>
-              <span style={{ fontSize: 14.5, fontWeight: 500, color: done[step.id] ? 'var(--ink-soft)' : 'var(--ink)' }}>
-                {step.label}
-              </span>
+              <div>
+                <p style={{ fontSize: 14.5, fontWeight: 500, color: 'var(--ink)' }}>{step.label}</p>
+                <p style={{ fontSize: 12, color: 'var(--ink-faint)', marginTop: 1 }}>{step.sub}</p>
+              </div>
               <div style={{ marginLeft: 'auto', display: 'flex' }}>
                 <Icon name="chevron-right" size={16} color="var(--ink-faint)" />
               </div>
@@ -97,9 +99,23 @@ export function SetupScreen({ group, onBack }: SetupScreenProps) {
           ))}
         </div>
 
+        {/* Enter the trip */}
+        <button className="btn" style={{ width: '100%', marginBottom: 24 }} onClick={() => onGo('home')}>
+          Start planning
+          <Icon name="chevron-right" size={16} color="#fff" />
+        </button>
+
         {/* Invite code */}
         <p className="eyebrow" style={{ marginBottom: 12 }}>Invite code</p>
-        <div className="card" style={{ padding: 'var(--cardpad)', textAlign: 'center', marginBottom: 40 }}>
+        <div
+          ref={codeRef}
+          className="card"
+          style={{
+            padding: 'var(--cardpad)', textAlign: 'center', marginBottom: 40,
+            transition: 'box-shadow 0.3s, border-color 0.3s',
+            ...(codePulse ? { borderColor: 'var(--terra)', boxShadow: '0 0 0 3px var(--terra-bg)' } : {}),
+          }}
+        >
           <p style={{ fontFamily: 'var(--serif)', fontSize: 36, fontWeight: 600, letterSpacing: '0.15em', color: 'var(--ink)', marginBottom: 4 }}>
             {group.inviteCode}
           </p>
