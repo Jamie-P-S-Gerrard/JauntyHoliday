@@ -6,7 +6,7 @@ import { Sheet } from '@/components/ui/Sheet';
 import { Placeholder } from '@/components/ui/Placeholder';
 import { Icon } from '@/components/ui/Icon';
 import { USER_NAMES } from '@/lib/data';
-import type { Group } from '@/types';
+import type { Group, TripStatus } from '@/types';
 
 interface GroupsScreenProps {
   groups: Group[];
@@ -71,26 +71,34 @@ function GroupCard({ group, onOpen }: { group: Group; onOpen: () => void }) {
     ? group.members.map((id) => USER_NAMES[id] ?? id).join(' & ')
     : `${group.members.length} members`;
 
+  const nextTrip = group.trips[0];
+  const tripLine = nextTrip
+    ? [nextTrip.dest || 'Destination TBC', nextTrip.when].filter(Boolean).join(' · ')
+      + (group.trips.length > 1 ? `  ·  +${group.trips.length - 1} more` : '')
+    : 'No trips yet';
+
   return (
     <button className="card" style={{ width: '100%', textAlign: 'left', cursor: 'pointer' }} onClick={onOpen}>
       {/* Image header */}
       <div style={{ position: 'relative', height: 94, overflow: 'hidden' }}>
-        <Placeholder tint={group.tint} style={{ position: 'absolute', inset: 0 }} label={group.dest} />
+        <Placeholder tint={group.tint} style={{ position: 'absolute', inset: 0 }} label={nextTrip?.dest ?? ''} />
         <div style={{
           position: 'absolute', inset: 0,
           background: 'linear-gradient(to bottom, transparent 40%, rgba(20,14,8,0.65))',
         }} />
         {/* Status chip */}
-        <div style={{ position: 'absolute', top: 10, right: 10 }}>
-          <StatusChip status={group.status} />
-        </div>
+        {nextTrip && (
+          <div style={{ position: 'absolute', top: 10, right: 10 }}>
+            <StatusChip status={nextTrip.status} />
+          </div>
+        )}
         {/* Group name */}
         <div style={{ position: 'absolute', bottom: 10, left: 12 }}>
           <p style={{ fontFamily: 'var(--serif)', fontSize: 16, fontWeight: 500, color: '#fff', lineHeight: 1.2 }}>
             {group.name}
           </p>
           <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.75)', marginTop: 2 }}>
-            {[group.dest || 'Destination TBC', group.when].filter(Boolean).join(' · ')}
+            {tripLine}
           </p>
         </div>
       </div>
@@ -106,7 +114,7 @@ function GroupCard({ group, onOpen }: { group: Group; onOpen: () => void }) {
   );
 }
 
-function StatusChip({ status }: { status: Group['status'] }) {
+function StatusChip({ status }: { status: TripStatus }) {
   if (status === 'Active') {
     return (
       <span className="chip" style={{ background: 'var(--olive)', color: '#fff', fontSize: 11.5 }}>
@@ -137,10 +145,16 @@ function CreateSheet({ open, onClose, onCreate }: { open: boolean; onClose: () =
 
   const handleCreate = () => {
     if (!name.trim()) return;
+    const firstTrip = (dest.trim() || when.trim())
+      ? [{
+          id: `t${Date.now()}`, dest: dest.trim(), when: when.trim(),
+          status: 'Idea' as TripStatus, tint: '#9aa56a', ready: false,
+        }]
+      : [];
     const g: Group = {
-      id: `g${Date.now()}`, name: name.trim(), dest: dest.trim(), when: when.trim(),
+      id: `g${Date.now()}`, name: name.trim(),
       members: ['j'], invited, inviteCode: Math.random().toString(36).slice(2, 8).toUpperCase(),
-      ready: false, status: 'Planning', tint: '#9aa56a',
+      tint: '#9aa56a', trips: firstTrip, prefs: { interests: [] },
     };
     onCreate(g);
     setName(''); setDest(''); setWhen(''); setEmail(''); setInvited([]);

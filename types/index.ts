@@ -10,17 +10,38 @@ export interface User {
   avatarKey: 'c' | 'j' | 'm' | 'r' | 'f' | 's' | 'ai';
 }
 
+export type TripStatus = 'Active' | 'Planning' | 'Idea';
+
+export interface TripSummary {
+  id: TripId;
+  dest: string;
+  when: string;
+  status: TripStatus;
+  tint: string;
+  ready: boolean;
+}
+
+export type GroupVibe = 'cozy' | 'adventure' | 'romantic' | 'city' | 'beach';
+export type GroupPace = 'chill' | 'balanced' | 'packed';
+export type GroupBudgetLevel = 'shoestring' | 'comfortable' | 'treat';
+
+export interface GroupPrefs {
+  vibe?: GroupVibe;
+  pace?: GroupPace;
+  budget?: GroupBudgetLevel;
+  interests: string[];
+  notes?: string;
+}
+
 export interface Group {
   id: GroupId;
   name: string;
-  dest: string;
-  when: string;
   members: UserId[];
   invited: string[];
   inviteCode: string;
-  ready: boolean;
-  status: 'Active' | 'Planning' | 'Idea';
   tint: string;
+  trips: TripSummary[];
+  prefs: GroupPrefs;
 }
 
 export interface Trip {
@@ -165,7 +186,7 @@ export interface FeedEvent {
 export type BudgetView = 'split' | 'joint';
 export type PlanTab = 'itinerary' | 'sidetrips' | 'packing';
 export type AppTab = 'home' | 'dates' | 'discover' | 'plan' | 'budget';
-export type AppStage = 'login' | 'groups' | 'setup' | 'trip';
+export type AppStage = 'login' | 'groups' | 'group' | 'setup' | 'trip';
 
 export interface ChatMessage {
   id: string;

@@ -33,10 +33,32 @@ RULES:
 - Be specific to Lombok — reference places, seasons, and local details where possible
 - Keep tone friendly and helpful, not generic`;
 
+interface GroupPrefsPayload {
+  vibe?: string;
+  pace?: string;
+  budget?: string;
+  interests?: string[];
+  notes?: string;
+}
+
+function prefsBlock(dest?: string, prefs?: GroupPrefsPayload): string {
+  const lines: string[] = [];
+  if (dest) lines.push(`- This group's current trip destination: ${dest}`);
+  if (prefs?.vibe) lines.push(`- Trip vibe they're after: ${prefs.vibe}`);
+  if (prefs?.pace) lines.push(`- Preferred pace: ${prefs.pace}`);
+  if (prefs?.budget) lines.push(`- Budget style: ${prefs.budget}`);
+  if (prefs?.interests?.length) lines.push(`- Interests: ${prefs.interests.join(', ')}`);
+  if (prefs?.notes) lines.push(`- Their own words: "${prefs.notes}"`);
+  if (lines.length === 0) return '';
+  return `\n\nGROUP PREFERENCES (tailor every suggestion to these):\n${lines.join('\n')}`;
+}
+
 export async function POST(req: NextRequest) {
-  const { query, history = [] } = await req.json() as {
+  const { query, history = [], dest, prefs } = await req.json() as {
     query: string;
     history: Array<{ role: 'user' | 'assistant'; text: string }>;
+    dest?: string;
+    prefs?: GroupPrefsPayload;
   };
 
   if (!query?.trim()) {
@@ -62,7 +84,7 @@ export async function POST(req: NextRequest) {
     model: 'claude-opus-4-8',
     max_tokens: 2048,
     thinking: { type: 'adaptive' },
-    system: SYSTEM,
+    system: SYSTEM + prefsBlock(dest, prefs),
     messages,
   });
 

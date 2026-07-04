@@ -167,9 +167,33 @@ export const FEED: FeedEvent[] = [
 ];
 
 export const INIT_GROUPS: Group[] = [
-  { id: 'g1', name: 'Christie & Jamie', dest: 'Lombok',      when: 'Oct 2026', members: ['c', 'j'],          invited: [], inviteCode: 'LOMBTK', ready: true,  status: 'Active',    tint: '#caa37a' },
-  { id: 'g2', name: 'The Gili Crew',    dest: 'Gili Islands', when: 'Mar 2027', members: ['j','c','m','r','s'], invited: [], inviteCode: 'GILI27', ready: false, status: 'Planning',  tint: '#7fa0c0' },
-  { id: 'g3', name: 'Reid Family · NZ', dest: 'Queenstown',  when: 'Dec 2026', members: ['j', 'f', 'm'],      invited: [], inviteCode: 'NZQTN6', ready: false, status: 'Idea',      tint: '#9aa56a' },
+  {
+    id: 'g1', name: 'Christie & Jamie', members: ['c', 'j'], invited: [], inviteCode: 'LOMBTK', tint: '#caa37a',
+    prefs: { vibe: 'beach', pace: 'balanced', budget: 'comfortable', interests: ['Snorkelling', 'Food & cafés', 'Culture'], notes: 'Calm & private over party spots.' },
+    trips: [
+      { id: 't1', dest: 'Lombok',   when: 'Oct 2026', status: 'Active', tint: '#caa37a', ready: true },
+      { id: 't2', dest: 'Kyoto',    when: 'Apr 2027', status: 'Idea',   tint: '#b07a9a', ready: false },
+    ],
+  },
+  {
+    id: 'g2', name: 'The Gili Crew', members: ['j', 'c', 'm', 'r', 's'], invited: [], inviteCode: 'GILI27', tint: '#7fa0c0',
+    prefs: { vibe: 'adventure', pace: 'packed', budget: 'shoestring', interests: ['Diving', 'Nightlife', 'Hiking'] },
+    trips: [
+      { id: 't3', dest: 'Gili Islands', when: 'Mar 2027', status: 'Planning', tint: '#7fa0c0', ready: false },
+    ],
+  },
+  {
+    id: 'g3', name: 'Reid Family · NZ', members: ['j', 'f', 'm'], invited: [], inviteCode: 'NZQTN6', tint: '#9aa56a',
+    prefs: { vibe: 'cozy', pace: 'chill', budget: 'comfortable', interests: ['Scenic drives', 'Food & cafés'] },
+    trips: [
+      { id: 't4', dest: 'Queenstown', when: 'Dec 2026', status: 'Idea', tint: '#9aa56a', ready: false },
+    ],
+  },
+];
+
+export const INTEREST_OPTIONS = [
+  'Snorkelling', 'Diving', 'Hiking', 'Food & cafés', 'Culture', 'Nightlife',
+  'Photography', 'Scenic drives', 'Wellness & spa', 'Surfing', 'Wildlife', 'Shopping',
 ];
 
 export const USER_NAMES: Record<string, string> = {

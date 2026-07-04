@@ -4,7 +4,7 @@ import { Wordmark } from '@/components/ui/Wordmark';
 import { AvatarStack } from '@/components/ui/Avatar';
 import { Icon } from '@/components/ui/Icon';
 import { Placeholder } from '@/components/ui/Placeholder';
-import type { AppTab, Group } from '@/types';
+import type { AppTab, Group, TripSummary } from '@/types';
 
 const STEPS: Array<{ id: string; label: string; sub: string; icon: string; tab: AppTab | null }> = [
   { id: 'dates',     label: 'Confirm the dates',   sub: 'Propose options and vote',      icon: 'calendar', tab: 'dates' },
@@ -15,11 +15,12 @@ const STEPS: Array<{ id: string; label: string; sub: string; icon: string; tab: 
 
 interface SetupScreenProps {
   group: Group;
+  trip: TripSummary;
   onBack: () => void;
   onGo: (tab: AppTab) => void;
 }
 
-export function SetupScreen({ group, onBack, onGo }: SetupScreenProps) {
+export function SetupScreen({ group, trip, onBack, onGo }: SetupScreenProps) {
   const [copied, setCopied] = useState(false);
   const [codePulse, setCodePulse] = useState(false);
   const codeRef = useRef<HTMLDivElement>(null);
@@ -46,7 +47,7 @@ export function SetupScreen({ group, onBack, onGo }: SetupScreenProps) {
       {/* Header */}
       <div style={{ padding: '16px var(--pad) 0', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
         <button onClick={onBack} style={{ color: 'var(--terra)', display: 'flex', alignItems: 'center', gap: 4, fontSize: 14, fontWeight: 600 }}>
-          <Icon name="arrow-left" size={16} color="var(--terra)" /> Groups
+          <Icon name="arrow-left" size={16} color="var(--terra)" /> {group.name}
         </button>
         <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
           <Wordmark size={18} />
@@ -56,13 +57,15 @@ export function SetupScreen({ group, onBack, onGo }: SetupScreenProps) {
 
       {/* Banner */}
       <div style={{ position: 'relative', margin: '16px var(--pad)', borderRadius: 'var(--radius)', overflow: 'hidden', height: 120 }}>
-        <Placeholder tint={group.tint} style={{ position: 'absolute', inset: 0 }} />
+        <Placeholder tint={trip.tint} style={{ position: 'absolute', inset: 0 }} />
         <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'flex-end', padding: 16 }}>
           <div>
-            <p style={{ fontFamily: 'var(--serif)', fontSize: 20, fontWeight: 500, color: '#fff' }}>{group.name}</p>
-            {(group.dest || group.when) && (
+            <p style={{ fontFamily: 'var(--serif)', fontSize: 20, fontWeight: 500, color: '#fff' }}>
+              {trip.dest || 'Somewhere wonderful'}
+            </p>
+            {(trip.when || trip.dest) && (
               <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.85)', marginTop: 2 }}>
-                {[group.dest, group.when].filter(Boolean).join(' · ')}
+                {[trip.when || 'Dates open'].filter(Boolean).join(' · ')}
               </p>
             )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>

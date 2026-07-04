@@ -4,6 +4,7 @@ import { TabBar } from './ui/TabBar';
 import { Sidebar } from './ui/Sidebar';
 import { LoginScreen } from './screens/LoginScreen';
 import { GroupsScreen } from './screens/GroupsScreen';
+import { GroupScreen } from './screens/GroupScreen';
 import { SetupScreen } from './screens/SetupScreen';
 import { HomeScreen } from './screens/HomeScreen';
 import { DatesScreen } from './screens/DatesScreen';
@@ -13,17 +14,21 @@ import { BudgetScreen } from './screens/BudgetScreen';
 import { INIT_GROUPS } from '@/lib/data';
 import { createClient } from '@/lib/supabase/client';
 import { supabaseConfigured } from '@/lib/supabase/configured';
-import type { AppStage, AppTab, Group } from '@/types';
+import type { AppStage, AppTab, Group, GroupPrefs, TripSummary } from '@/types';
 
 export function AppShell() {
   const [stage, setStage] = useState<AppStage>('login');
   const [checking, setChecking] = useState(true);
   const [userName, setUserName] = useState<string | null>(null);
   const [groups, setGroups] = useState<Group[]>(INIT_GROUPS);
-  const [active, setActive] = useState<Group | null>(null);
+  const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
+  const [activeTripId, setActiveTripId] = useState<string | null>(null);
   const [tab, setTab] = useState<AppTab>('home');
   const [saved, setSaved] = useState<string[]>(['a2']);
   const userId = 'j';
+
+  const activeGroup = groups.find((g) => g.id === activeGroupId) ?? null;
+  const activeTrip = activeGroup?.trips.find((t) => t.id === activeTripId) ?? null;
 
   // Restore an existing Supabase session on load; react to sign-in/out.
   useEffect(() => {
@@ -66,28 +71,51 @@ export function AppShell() {
   const addToPlan = (id: string) =>
     setSaved((s) => (s.includes(id) ? s : [...s, id]));
 
+  const updateGroup = (id: string, fn: (g: Group) => Group) =>
+    setGroups((gs) => gs.map((g) => (g.id === id ? fn(g) : g)));
+
   const openGroup = (g: Group) => {
-    setActive(g);
-    setStage(g.ready ? 'trip' : 'setup');
+    setActiveGroupId(g.id);
+    setStage('group');
+  };
+
+  const createGroup = (g: Group) => {
+    setGroups((gs) => [g, ...gs]);
+    setActiveGroupId(g.id);
+    setStage('group');
+  };
+
+  const openTrip = (t: TripSummary) => {
+    setActiveTripId(t.id);
+    setStage(t.ready ? 'trip' : 'setup');
     setTab('home');
   };
 
-  // Entering the trip from setup marks the group ready, so reopening it
-  // goes straight to the trip screens instead of back to first steps.
-  const enterTrip = (g: Group, tab: AppTab) => {
-    const ready = { ...g, ready: true };
-    setGroups((gs) => gs.map((x) => (x.id === g.id ? ready : x)));
-    setActive(ready);
-    setStage('trip');
-    setTab(tab);
-  };
-  const createGroup = (g: Group) => {
-    setGroups((gs) => [g, ...gs]);
-    setActive(g);
+  const createTrip = (t: TripSummary) => {
+    if (!activeGroup) return;
+    updateGroup(activeGroup.id, (g) => ({ ...g, trips: [...g.trips, t] }));
+    setActiveTripId(t.id);
     setStage('setup');
   };
 
-  const activeGroup = active ?? groups[0];
+  const updatePrefs = (p: GroupPrefs) => {
+    if (!activeGroup) return;
+    updateGroup(activeGroup.id, (g) => ({ ...g, prefs: p }));
+  };
+
+  // Entering the trip from setup marks it ready, so reopening it goes
+  // straight to the trip screens instead of back to first steps.
+  const enterTrip = (tab: AppTab) => {
+    if (!activeGroup || !activeTrip) return;
+    updateGroup(activeGroup.id, (g) => ({
+      ...g,
+      trips: g.trips.map((t) =>
+        t.id === activeTrip.id ? { ...t, ready: true, status: 'Planning' as const } : t
+      ),
+    }));
+    setStage('trip');
+    setTab(tab);
+  };
 
   const inTrip = stage === 'trip';
 
@@ -106,7 +134,7 @@ export function AppShell() {
             active={tab}
             onChange={setTab}
             groupName={activeGroup?.name ?? ''}
-            onSwitchGroup={() => setStage('groups')}
+            onSwitchGroup={() => setStage('group')}
           />
         )}
 
@@ -127,28 +155,45 @@ export function AppShell() {
             />
           )}
 
-          {stage === 'setup' && activeGroup && (
-            <SetupScreen
+          {stage === 'group' && activeGroup && (
+            <GroupScreen
               group={activeGroup}
               onBack={() => setStage('groups')}
-              onGo={(tab) => enterTrip(activeGroup, tab)}
+              onOpenTrip={openTrip}
+              onCreateTrip={createTrip}
+              onUpdatePrefs={updatePrefs}
             />
           )}
 
-          {inTrip && (
+          {stage === 'setup' && activeGroup && activeTrip && (
+            <SetupScreen
+              group={activeGroup}
+              trip={activeTrip}
+              onBack={() => setStage('group')}
+              onGo={enterTrip}
+            />
+          )}
+
+          {inTrip && activeGroup && activeTrip && (
             <>
               {tab === 'home' && (
                 <HomeScreen
-                  groupName={activeGroup?.name ?? ''}
-                  dest={activeGroup?.id === 'g1' ? undefined : activeGroup?.dest || undefined}
-                  when={activeGroup?.when || undefined}
-                  onSwitch={() => setStage('groups')}
+                  groupName={activeGroup.name}
+                  dest={activeTrip.id === 't1' ? undefined : activeTrip.dest || undefined}
+                  when={activeTrip.when || undefined}
+                  onSwitch={() => setStage('group')}
                   go={setTab}
                 />
               )}
               {tab === 'dates'    && <DatesScreen />}
               {tab === 'discover' && (
-                <DiscoverScreen saved={saved} onSave={toggleSave} onAdd={addToPlan} />
+                <DiscoverScreen
+                  saved={saved}
+                  onSave={toggleSave}
+                  onAdd={addToPlan}
+                  dest={activeTrip.dest || undefined}
+                  prefs={activeGroup.prefs}
+                />
               )}
               {tab === 'plan'   && <PlanScreen saved={saved} />}
               {tab === 'budget' && <BudgetScreen />}

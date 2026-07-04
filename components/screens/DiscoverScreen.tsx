@@ -4,22 +4,26 @@ import { Avatar } from '@/components/ui/Avatar';
 import { Icon } from '@/components/ui/Icon';
 import { Placeholder } from '@/components/ui/Placeholder';
 import { DISCOVER } from '@/lib/data';
-import type { ChatMessage, DiscoverCard } from '@/types';
+import type { ChatMessage, DiscoverCard, GroupPrefs } from '@/types';
 
 interface DiscoverScreenProps {
   saved: string[];
   onSave: (id: string) => void;
   onAdd: (id: string) => void;
+  dest?: string;
+  prefs?: GroupPrefs;
 }
 
 async function callDiscover(
   query: string,
   history: Array<{ role: 'user' | 'assistant'; text: string }>,
+  dest?: string,
+  prefs?: GroupPrefs,
 ): Promise<{ text: string; cardIds?: string[]; culture?: boolean }> {
   const res = await fetch('/api/discover', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query, history }),
+    body: JSON.stringify({ query, history, dest, prefs }),
   });
   if (!res.ok) throw new Error('discover api error');
   return res.json();
@@ -33,7 +37,7 @@ const INITIAL_MESSAGES: ChatMessage[] = [
   },
 ];
 
-export function DiscoverScreen({ saved, onSave, onAdd }: DiscoverScreenProps) {
+export function DiscoverScreen({ saved, onSave, onAdd, dest, prefs }: DiscoverScreenProps) {
   const [messages, setMessages] = useState<(ChatMessage & { added?: string[] })[]>(INITIAL_MESSAGES as any);
   const [input, setInput] = useState('');
   const [thinking, setThinking] = useState(false);
@@ -54,7 +58,7 @@ export function DiscoverScreen({ saved, onSave, onAdd }: DiscoverScreenProps) {
       const history = messages
         .filter((m) => m.id !== 'intro')
         .map((m) => ({ role: m.role as 'user' | 'assistant', text: m.text }));
-      const reply = await callDiscover(text.trim(), history);
+      const reply = await callDiscover(text.trim(), history, dest, prefs);
       const aiMsg: any = { id: `a${Date.now()}`, role: 'assistant', ...reply };
       setMessages((prev) => [...prev, aiMsg]);
     } catch {
