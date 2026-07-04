@@ -210,14 +210,19 @@ export function AppShell() {
 
   const inTrip = stage === 'trip';
 
+  // The group's saved vibe re-skins everything inside that group
+  const vibe = (stage === 'group' || stage === 'setup' || stage === 'trip')
+    ? activeGroup?.prefs.vibe
+    : undefined;
+
   // Avoid flashing the login screen while the session is being restored
   if (checking) {
     return <div className="app-host"><div className="app-frame" /></div>;
   }
 
   return (
-    <div className={`app-host${inTrip ? ' app-host--trip' : ''}`}>
-      <div className={`app-frame${inTrip ? ' app-frame--trip' : ''}`}>
+    <div className={`app-host${inTrip ? ' app-host--trip' : ''}`} data-vibe={vibe}>
+      <div className={`app-frame${inTrip ? ' app-frame--trip' : ''}`} data-vibe={vibe}>
 
         {/* Sidebar — tablet only, trip stage only */}
         {inTrip && (

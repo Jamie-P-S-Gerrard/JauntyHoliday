@@ -71,6 +71,72 @@
   --rowgap:  9px;
 }
 
+/* ─── Trip vibes ──────────────────────────────────────────────────
+   Each group's saved vibe re-skins the app inside that group.
+   "cozy" is the default palette above; the others override the
+   accent + background tokens. Same variable roles everywhere:
+   --terra = primary accent, --olive = secondary, --gold = highlight. */
+
+[data-vibe='romantic'] {
+  --bg:        #f6edee;
+  --bg-2:      #f0e2e4;
+  --surface:   #fffbfa;
+  --surface-2: #f7ebec;
+  --terra:     #b8506e;
+  --terra-ink: #8e3a52;
+  --terra-bg:  #f5dde4;
+  --olive:     #97627e;
+  --olive-ink: #7a4a64;
+  --olive-bg:  #eddfe7;
+  --gold:      #c08a62;
+  --gold-bg:   #f2e4d6;
+}
+
+[data-vibe='adventure'] {
+  --bg:        #eff2e2;
+  --bg-2:      #e6ecd2;
+  --surface:   #fdfff5;
+  --surface-2: #f2f4e4;
+  --terra:     #d95d2a;
+  --terra-ink: #a83f15;
+  --terra-bg:  #f8e0d2;
+  --olive:     #2f8a5c;
+  --olive-ink: #1f6b45;
+  --olive-bg:  #d9ecdc;
+  --gold:      #d9a621;
+  --gold-bg:   #f5ecc9;
+}
+
+[data-vibe='city'] {
+  --bg:        #eef0f3;
+  --bg-2:      #e4e8ed;
+  --surface:   #fdfdfe;
+  --surface-2: #f0f2f5;
+  --terra:     #3a6ea5;
+  --terra-ink: #2b5480;
+  --terra-bg:  #dde8f4;
+  --olive:     #56748c;
+  --olive-ink: #40596d;
+  --olive-bg:  #e0e9ef;
+  --gold:      #b98a3e;
+  --gold-bg:   #f0e6cf;
+}
+
+[data-vibe='beach'] {
+  --bg:        #e9f2ef;
+  --bg-2:      #deece7;
+  --surface:   #fbfffd;
+  --surface-2: #ebf3f0;
+  --terra:     #1f9084;
+  --terra-ink: #14695f;
+  --terra-bg:  #d7ece9;
+  --olive:     #e07856;
+  --olive-ink: #b5533a;
+  --olive-bg:  #f8e2da;
+  --gold:      #c2a05c;
+  --gold-bg:   #f0e8d2;
+}
+
 /* ─── Base ────────────────────────────────────────────────────── */
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -245,12 +311,15 @@ html, body {
   transform: translateX(-50%);
   width: 100%;
   max-width: 430px;
+  max-height: 88vh;
+  overflow-y: auto;
   background: var(--surface);
   border-radius: 28px 28px 0 0;
   padding: 16px var(--pad) 40px;
   z-index: 70;
   animation: slideUp 0.3s cubic-bezier(.2,.8,.3,1);
 }
+.sheet::-webkit-scrollbar { display: none; }
 .sheet-handle {
   width: 38px;
   height: 5px;

@@ -20,7 +20,7 @@ export function Sheet({ open, onClose, children }: SheetProps) {
   return (
     <>
       <div className="sheet-scrim" onClick={onClose} />
-      <div className="sheet fade-in">
+      <div className="sheet">
         <div className="sheet-handle" />
         {children}
       </div>
