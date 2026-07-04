@@ -4,14 +4,26 @@ import { Avatar } from '@/components/ui/Avatar';
 import { Icon } from '@/components/ui/Icon';
 import { Placeholder } from '@/components/ui/Placeholder';
 import { Sheet } from '@/components/ui/Sheet';
+import { MoodBoard } from './MoodBoard';
 import { DAYS, SIDE_TRIPS, PACKING_LISTS, DISCOVER, USER_NAMES } from '@/lib/data';
-import type { PlanTab, ItineraryItem, SideTrip, PackingList } from '@/types';
+import type { PlanTab, ItineraryItem, SideTrip, PackingList, BoardApi } from '@/types';
 
 interface PlanScreenProps {
   saved: string[];
+  tripId: string;
+  groupId: string;
+  userId: string;
+  boardApi: BoardApi;
 }
 
-export function PlanScreen({ saved }: PlanScreenProps) {
+const TAB_LABELS: Record<PlanTab, string> = {
+  itinerary: 'Itinerary',
+  sidetrips: 'Side trips',
+  packing: 'Packing',
+  board: 'Board',
+};
+
+export function PlanScreen({ saved, tripId, groupId, userId, boardApi }: PlanScreenProps) {
   const [tab, setTab] = useState<PlanTab>('itinerary');
 
   return (
@@ -25,7 +37,7 @@ export function PlanScreen({ saved }: PlanScreenProps) {
         <div style={{
           display: 'flex', background: 'var(--surface-2)', borderRadius: 12, padding: 3, gap: 2,
         }}>
-          {(['itinerary', 'sidetrips', 'packing'] as PlanTab[]).map((t) => (
+          {(['itinerary', 'sidetrips', 'packing', 'board'] as PlanTab[]).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -33,12 +45,13 @@ export function PlanScreen({ saved }: PlanScreenProps) {
                 flex: 1, height: 34, borderRadius: 10,
                 background: tab === t ? 'var(--surface)' : 'transparent',
                 boxShadow: tab === t ? '0 1px 4px rgba(44,40,35,0.1)' : 'none',
-                fontSize: 13, fontWeight: tab === t ? 700 : 500,
+                fontSize: 12.5, fontWeight: tab === t ? 700 : 500,
                 color: tab === t ? 'var(--ink)' : 'var(--ink-soft)',
                 transition: 'all 0.15s',
+                whiteSpace: 'nowrap',
               }}
             >
-              {t === 'sidetrips' ? 'Side trips' : t.charAt(0).toUpperCase() + t.slice(1)}
+              {TAB_LABELS[t]}
             </button>
           ))}
         </div>
@@ -47,6 +60,9 @@ export function PlanScreen({ saved }: PlanScreenProps) {
       {tab === 'itinerary' && <ItineraryBody saved={saved} />}
       {tab === 'sidetrips' && <SideTripsBody />}
       {tab === 'packing' && <PackingBody />}
+      {tab === 'board' && (
+        <MoodBoard tripId={tripId} groupId={groupId} userId={userId} api={boardApi} />
+      )}
     </div>
   );
 }

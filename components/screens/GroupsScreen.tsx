@@ -14,10 +14,11 @@ interface GroupsScreenProps {
   userName?: string;
   onOpen: (g: Group) => void;
   onCreate: (g: Group) => void;
+  onJoin: (code: string) => Promise<string | null>;
   onSignOut: () => void;
 }
 
-export function GroupsScreen({ groups, userId, userName, onOpen, onCreate, onSignOut }: GroupsScreenProps) {
+export function GroupsScreen({ groups, userId, userName, onOpen, onCreate, onJoin, onSignOut }: GroupsScreenProps) {
   const [createOpen, setCreateOpen] = useState(false);
   const [joinOpen, setJoinOpen] = useState(false);
 
@@ -61,7 +62,7 @@ export function GroupsScreen({ groups, userId, userName, onOpen, onCreate, onSig
       </div>
 
       <CreateSheet open={createOpen} onClose={() => setCreateOpen(false)} onCreate={(g) => { setCreateOpen(false); onCreate(g); }} />
-      <JoinSheet open={joinOpen} onClose={() => setJoinOpen(false)} />
+      <JoinSheet open={joinOpen} onClose={() => setJoinOpen(false)} onJoin={onJoin} />
     </div>
   );
 }
@@ -218,8 +219,26 @@ function CreateSheet({ open, onClose, onCreate }: { open: boolean; onClose: () =
   );
 }
 
-function JoinSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+function JoinSheet({ open, onClose, onJoin }: {
+  open: boolean; onClose: () => void; onJoin: (code: string) => Promise<string | null>;
+}) {
   const [code, setCode] = useState('');
+  const [joining, setJoining] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const join = async () => {
+    setJoining(true);
+    setError(null);
+    const err = await onJoin(code);
+    setJoining(false);
+    if (err) {
+      setError(err);
+    } else {
+      setCode('');
+      onClose();
+    }
+  };
+
   return (
     <Sheet open={open} onClose={onClose}>
       <h2 className="sec-title" style={{ marginBottom: 8 }}>Join a group</h2>
@@ -229,16 +248,19 @@ function JoinSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
         placeholder="ABC123"
         value={code}
         maxLength={6}
-        onChange={(e) => setCode(e.target.value.toUpperCase())}
+        onChange={(e) => { setCode(e.target.value.toUpperCase()); setError(null); }}
         style={{ fontFamily: 'var(--serif)', fontSize: 28, textAlign: 'center', letterSpacing: '0.3em' }}
       />
+      {error && (
+        <p style={{ textAlign: 'center', fontSize: 12.5, color: 'var(--terra)', marginTop: 10 }}>{error}</p>
+      )}
       <button
         className="btn"
-        disabled={code.length < 6}
+        disabled={code.length < 6 || joining}
         style={{ width: '100%', marginTop: 20 }}
-        onClick={onClose}
+        onClick={join}
       >
-        Join group
+        {joining ? 'Joining…' : 'Join group'}
       </button>
     </Sheet>
   );

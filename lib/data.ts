@@ -203,3 +203,12 @@ export const USER_NAMES: Record<string, string> = {
 export const USER_INITIALS: Record<string, string> = {
   c: 'C', j: 'J', m: 'M', r: 'R', f: 'F', s: 'S', ai: '✦',
 };
+
+// Real signed-in users get merged in after fetching profiles from Supabase,
+// so every screen's name/initial lookups keep working with UUID user ids.
+export function registerProfiles(profiles: Array<{ id: string; name: string; initials: string }>) {
+  for (const p of profiles) {
+    USER_NAMES[p.id] = p.name;
+    USER_INITIALS[p.id] = p.initials;
+  }
+}

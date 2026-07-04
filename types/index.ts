@@ -60,6 +60,32 @@ export interface DateOption {
   weather?: string;
   proposedBy: UserId;
   votes: UserId[];
+  startDate?: string; // ISO yyyy-mm-dd
+  endDate?: string;
+}
+
+export interface BoardItem {
+  id: string;
+  title: string;
+  note?: string;
+  tint: string;
+  who: UserId;
+}
+
+// Injected per environment: real Supabase implementation when configured,
+// in-memory demo implementation otherwise.
+export interface DatesApi {
+  list(tripId: string): Promise<DateOption[]>;
+  propose(tripId: string, input: { start: string; end: string; note?: string }): Promise<void>;
+  vote(optionId: string): Promise<void>;
+  unvote(optionId: string): Promise<void>;
+  remove(optionId: string): Promise<void>;
+}
+
+export interface BoardApi {
+  list(tripId: string): Promise<BoardItem[]>;
+  add(tripId: string, groupId: string, input: { title: string; note?: string; tint: string }): Promise<void>;
+  remove(itemId: string): Promise<void>;
 }
 
 export type DiscoverCat = 'stay' | 'eat' | 'see' | 'culture';
@@ -184,7 +210,7 @@ export interface FeedEvent {
 }
 
 export type BudgetView = 'split' | 'joint';
-export type PlanTab = 'itinerary' | 'sidetrips' | 'packing';
+export type PlanTab = 'itinerary' | 'sidetrips' | 'packing' | 'board';
 export type AppTab = 'home' | 'dates' | 'discover' | 'plan' | 'budget';
 export type AppStage = 'login' | 'groups' | 'group' | 'setup' | 'trip';
 
