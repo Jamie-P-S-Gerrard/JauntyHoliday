@@ -5,34 +5,6 @@ import { demoDiscoverReply } from '@/lib/discover-demo';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const SYSTEM = `You are a warm, knowledgeable travel assistant inside Jaunt, a trip-planning app.
-
-TRIP CONTEXT:
-- Travellers: Christie & Jamie (couple, planning together)
-- Destination: Lombok, Indonesia
-- Dates: October 3–12, 2026 (10 days, 9 nights)
-
-AVAILABLE RECOMMENDATION CARDS (reference by id when relevant):
-- a1 · activity · Pink Beach snorkel trip · Sekotong, SW Lombok (full day, $38pp, rating 4.8)
-- a2 · stay · Ashtari Hillside Villa · Kuta, ocean view (sleeps 2, $94/night, rating 4.9)
-- e1 · eat · Warung Flora · Kuta — authentic Sasak home cooking ($6/head, rating 4.7)
-- e2 · eat · Ashtari Lounge — sunset table · Kuta hills (dinner for two, book ahead, rating 4.6)
-- a3 · activity · Tiu Kelep waterfall hike · Senaru, North Lombok (half day, $22pp, rating 4.7)
-- a4 · activity · Gili Nanggu day boat · Three south Gilis (full day, $45pp, rating 4.6)
-
-RESPONSE FORMAT — reply ONLY with valid JSON, no markdown fences, no preamble:
-{
-  "text": "1–3 warm, specific sentences answering the query",
-  "cardIds": ["a1", "e1"],
-  "culture": false
-}
-
-RULES:
-- "cardIds": include only card IDs that directly match the query (omit key or use [] if none apply)
-- "culture": true ONLY when the user asks about local customs, religion, etiquette, or culture tips
-- Be specific to Lombok — reference places, seasons, and local details where possible
-- Keep tone friendly and helpful, not generic`;
-
 interface GroupPrefsPayload {
   vibe?: string;
   pace?: string;
@@ -41,16 +13,53 @@ interface GroupPrefsPayload {
   notes?: string;
 }
 
-function prefsBlock(dest?: string, prefs?: GroupPrefsPayload): string {
-  const lines: string[] = [];
-  if (dest) lines.push(`- This group's current trip destination: ${dest}`);
-  if (prefs?.vibe) lines.push(`- Trip vibe they're after: ${prefs.vibe}`);
-  if (prefs?.pace) lines.push(`- Preferred pace: ${prefs.pace}`);
-  if (prefs?.budget) lines.push(`- Budget style: ${prefs.budget}`);
-  if (prefs?.interests?.length) lines.push(`- Interests: ${prefs.interests.join(', ')}`);
-  if (prefs?.notes) lines.push(`- Their own words: "${prefs.notes}"`);
-  if (lines.length === 0) return '';
-  return `\n\nGROUP PREFERENCES (tailor every suggestion to these):\n${lines.join('\n')}`;
+// The seeded Lombok demo catalog — only referenced when the trip is the
+// Lombok demo, so replies can point at real recommendation cards by id.
+const LOMBOK_CATALOG = `
+AVAILABLE RECOMMENDATION CARDS (reference by id when relevant):
+- a1 · activity · Pink Beach snorkel trip · Sekotong, SW Lombok (full day, $38pp, rating 4.8)
+- a2 · stay · Ashtari Hillside Villa · Kuta, ocean view (sleeps 2, $94/night, rating 4.9)
+- e1 · eat · Warung Flora · Kuta — authentic Sasak home cooking ($6/head, rating 4.7)
+- e2 · eat · Ashtari Lounge — sunset table · Kuta hills (dinner for two, book ahead, rating 4.6)
+- a3 · activity · Tiu Kelep waterfall hike · Senaru, North Lombok (half day, $22pp, rating 4.7)
+- a4 · activity · Gili Nanggu day boat · Three south Gilis (full day, $45pp, rating 4.6)
+
+Use "cardIds" for catalog matches, and "culture": true ONLY when the user asks
+about local customs, religion, etiquette, or culture tips.`;
+
+function buildSystem(dest?: string, prefs?: GroupPrefsPayload): string {
+  const place = dest?.trim() || 'a destination the group has not chosen yet';
+  const isLombok = /lombok/i.test(dest ?? '');
+
+  const prefLines: string[] = [];
+  if (prefs?.vibe) prefLines.push(`- Trip vibe they're after: ${prefs.vibe}`);
+  if (prefs?.pace) prefLines.push(`- Preferred pace: ${prefs.pace}`);
+  if (prefs?.budget) prefLines.push(`- Budget style: ${prefs.budget}`);
+  if (prefs?.interests?.length) prefLines.push(`- Interests: ${prefs.interests.join(', ')}`);
+  if (prefs?.notes) prefLines.push(`- Their own words: "${prefs.notes}"`);
+
+  return `You are a warm, knowledgeable travel assistant inside Jaunt, a collaborative trip-planning app.
+
+TRIP CONTEXT:
+- The group is planning a trip to: ${place}
+${prefLines.length > 0 ? `\nGROUP PREFERENCES (tailor every suggestion to these):\n${prefLines.join('\n')}` : ''}
+${isLombok ? LOMBOK_CATALOG : ''}
+
+RESPONSE FORMAT — reply ONLY with valid JSON, no markdown fences, no preamble:
+{
+  "text": "1–3 warm, specific sentences answering the query",
+  ${isLombok ? '"cardIds": ["a1"],' : ''}
+  "suggestions": [
+    { "title": "Name of place/experience", "area": "Neighbourhood or region", "detail": "One specific, useful sentence", "price": "$40pp", "kind": "stay|eat|activity" }
+  ]${isLombok ? ',\n  "culture": false' : ''}
+}
+
+RULES:
+- "suggestions": 0–3 concrete, real places or experiences that match the query${isLombok ? ' (omit when cardIds already cover it)' : ''}
+- "price" is a short indicative string like "$40pp" or "$$" — omit if unknown
+- Be specific to ${place} — reference real neighbourhoods, seasons, and local details
+- If no destination is chosen yet, help them choose: suggest destinations as "suggestions" with kind "activity"
+- Keep tone friendly and helpful, not generic`;
 }
 
 export async function POST(req: NextRequest) {
@@ -69,7 +78,7 @@ export async function POST(req: NextRequest) {
   // Discover UI is fully testable offline.
   if (!process.env.ANTHROPIC_API_KEY) {
     await new Promise((r) => setTimeout(r, 400)); // brief "thinking" pause
-    return Response.json(demoDiscoverReply(query));
+    return Response.json(demoDiscoverReply(query, dest));
   }
 
   const client = new Anthropic();
@@ -84,7 +93,7 @@ export async function POST(req: NextRequest) {
     model: 'claude-opus-4-8',
     max_tokens: 2048,
     thinking: { type: 'adaptive' },
-    system: SYSTEM + prefsBlock(dest, prefs),
+    system: buildSystem(dest, prefs),
     messages,
   });
 

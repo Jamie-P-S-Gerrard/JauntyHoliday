@@ -4,7 +4,7 @@ import { Avatar } from '@/components/ui/Avatar';
 import { Icon } from '@/components/ui/Icon';
 import { Placeholder } from '@/components/ui/Placeholder';
 import { DISCOVER } from '@/lib/data';
-import type { ChatMessage, DiscoverCard, GroupPrefs } from '@/types';
+import type { AiSuggestion, BoardApi, ChatMessage, DiscoverCard, GroupPrefs } from '@/types';
 
 interface DiscoverScreenProps {
   saved: string[];
@@ -12,6 +12,9 @@ interface DiscoverScreenProps {
   onAdd: (id: string) => void;
   dest?: string;
   prefs?: GroupPrefs;
+  tripId: string;
+  groupId: string;
+  boardApi: BoardApi;
 }
 
 async function callDiscover(
@@ -29,16 +32,31 @@ async function callDiscover(
   return res.json();
 }
 
-const INITIAL_MESSAGES: ChatMessage[] = [
-  {
+function introFor(dest?: string): ChatMessage {
+  return {
     id: 'intro',
     role: 'assistant',
-    text: 'Hi! I\'m your Lombok trip assistant. Ask me about beaches, stays, food, or local culture — I\'ll find the best options for you.',
-  },
-];
+    text: dest
+      ? `Hi! I'm your ${dest} trip assistant. Ask me about stays, food, things to do, or local culture — I'll tailor everything to your crew.`
+      : "Hi! You haven't picked a destination yet — tell me what you're dreaming of and I'll suggest some places.",
+  };
+}
 
-export function DiscoverScreen({ saved, onSave, onAdd, dest, prefs }: DiscoverScreenProps) {
-  const [messages, setMessages] = useState<(ChatMessage & { added?: string[] })[]>(INITIAL_MESSAGES as any);
+function promptsFor(dest?: string): string[] {
+  if (dest && /lombok/i.test(dest)) return DISCOVER.prompts;
+  if (!dest) {
+    return ['Warm, calm, and cheap in October?', 'Best foodie city breaks', 'Where for a first family adventure?', 'Hidden-gem beach destinations'];
+  }
+  return [
+    `Best areas to stay in ${dest}`,
+    `Must-try food in ${dest}`,
+    `Top things to do in ${dest}`,
+    `Local culture tips for ${dest}`,
+  ];
+}
+
+export function DiscoverScreen({ saved, onSave, onAdd, dest, prefs, tripId, groupId, boardApi }: DiscoverScreenProps) {
+  const [messages, setMessages] = useState<(ChatMessage & { added?: string[]; pinned?: string[] })[]>([introFor(dest)] as any);
   const [input, setInput] = useState('');
   const [thinking, setThinking] = useState(false);
   const [filter, setFilter] = useState('all');
@@ -78,7 +96,7 @@ export function DiscoverScreen({ saved, onSave, onAdd, dest, prefs }: DiscoverSc
       <div className="screen-header" style={{ paddingBottom: 12 }}>
         <p className="hdr-overline" style={{ color: 'var(--gold)' }}>Powered by Trip AI</p>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <h1 className="hdr-title">Discover <em>{' '}Lombok</em></h1>
+          <h1 className="hdr-title">Discover <em>{' '}{dest || 'together'}</em></h1>
           <Avatar userId="ai" size="md" />
         </div>
       </div>
@@ -132,7 +150,40 @@ export function DiscoverScreen({ saved, onSave, onAdd, dest, prefs }: DiscoverSc
                 })}
               </div>
             )}
-            {msg.culture && (
+            {msg.suggestions && msg.suggestions.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, margin: '8px 0 16px 42px' }}>
+                {msg.suggestions.map((s, si) => {
+                  const key = `${msg.id}-${si}`;
+                  return (
+                    <AiSuggestionCard
+                      key={key}
+                      suggestion={s}
+                      pinned={((msg as any).pinned ?? []).includes(key)}
+                      onPin={async () => {
+                        try {
+                          await boardApi.add(tripId, groupId, {
+                            kind: 'idea',
+                            title: s.title,
+                            note: [s.area, s.detail, s.price].filter(Boolean).join(' · '),
+                            tint: SUGGESTION_TINTS[s.kind] ?? '#caa37a',
+                          });
+                          setMessages((prev) =>
+                            prev.map((m) =>
+                              m.id === msg.id
+                                ? { ...m, pinned: [...((m as any).pinned ?? []), key] }
+                                : m
+                            )
+                          );
+                        } catch (e) {
+                          window.alert(e instanceof Error ? e.message : 'Could not pin');
+                        }
+                      }}
+                    />
+                  );
+                })}
+              </div>
+            )}
+            {msg.culture && dest && /lombok/i.test(dest) && (
               <div style={{ margin: '8px 0 16px 42px' }}>
                 <CultureCard />
               </div>
@@ -161,7 +212,7 @@ export function DiscoverScreen({ saved, onSave, onAdd, dest, prefs }: DiscoverSc
         {/* Prompt suggestions */}
         {messages.length === 1 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
-            {DISCOVER.prompts.slice(0, 4).map((p) => (
+            {promptsFor(dest).slice(0, 4).map((p) => (
               <button
                 key={p}
                 onClick={() => send(p)}
@@ -189,7 +240,7 @@ export function DiscoverScreen({ saved, onSave, onAdd, dest, prefs }: DiscoverSc
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <input
             className="input"
-            placeholder="Ask about Lombok…"
+            placeholder={dest ? `Ask about ${dest}…` : 'Where should we go?'}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && send(input)}
@@ -209,6 +260,52 @@ export function DiscoverScreen({ saved, onSave, onAdd, dest, prefs }: DiscoverSc
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+const SUGGESTION_TINTS: Record<string, string> = {
+  stay: '#9aa56a', eat: '#cf9a5e', activity: '#7fa0c0',
+};
+
+function AiSuggestionCard({ suggestion, pinned, onPin }: {
+  suggestion: AiSuggestion; pinned: boolean; onPin: () => void;
+}) {
+  const kindLabel: Record<string, string> = { stay: 'Stay', eat: 'Eats', activity: 'To do' };
+  const kindIcon: Record<string, string> = { stay: 'bed', eat: 'utensils', activity: 'waves' };
+
+  return (
+    <div className="card" style={{ padding: 'var(--cardpad)' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+            <span className="chip" style={{ height: 22, fontSize: 10.5, background: 'var(--surface-2)' }}>
+              <Icon name={kindIcon[suggestion.kind] ?? 'star'} size={10} color="var(--ink-soft)" />
+              {kindLabel[suggestion.kind] ?? suggestion.kind}
+            </span>
+          </div>
+          <p style={{ fontSize: 15, fontWeight: 600 }}>{suggestion.title}</p>
+          <p style={{ fontSize: 12.5, color: 'var(--ink-soft)', marginTop: 2 }}>{suggestion.area}</p>
+        </div>
+        {suggestion.price && (
+          <p style={{ fontFamily: 'var(--serif)', fontSize: 16, fontWeight: 600, flexShrink: 0 }}>{suggestion.price}</p>
+        )}
+      </div>
+      <p style={{ fontSize: 12.5, color: 'var(--ink-soft)', lineHeight: 1.5, margin: '8px 0 12px' }}>
+        {suggestion.detail}
+      </p>
+      <button
+        className={`btn sm${pinned ? ' olive' : ' ghost'}`}
+        style={{ width: '100%' }}
+        onClick={onPin}
+        disabled={pinned}
+      >
+        {pinned ? (
+          <><Icon name="check" size={13} color="#fff" strokeWidth={2.5} /> Pinned to board</>
+        ) : (
+          <><Icon name="plus" size={13} color="var(--ink)" /> Pin to mood board</>
+        )}
+      </button>
     </div>
   );
 }

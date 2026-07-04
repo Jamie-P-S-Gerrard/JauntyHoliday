@@ -293,11 +293,15 @@ export function AppShell() {
               )}
               {tab === 'discover' && (
                 <DiscoverScreen
+                  key={activeTrip.id}
                   saved={saved}
                   onSave={toggleSave}
                   onAdd={addToPlan}
                   dest={activeTrip.dest || undefined}
                   prefs={activeGroup.prefs}
+                  tripId={activeTrip.id}
+                  groupId={activeGroup.id}
+                  boardApi={boardApi}
                 />
               )}
               {tab === 'plan' && (

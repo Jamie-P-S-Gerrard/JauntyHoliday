@@ -54,7 +54,22 @@ const RULES: Array<{ match: RegExp; reply: DemoReply }> = [
   },
 ];
 
-export function demoDiscoverReply(query: string): DemoReply {
+export function demoDiscoverReply(query: string, dest?: string): DemoReply & {
+  suggestions?: Array<{ title: string; area: string; detail: string; price?: string; kind: string }>;
+} {
+  // Non-Lombok trips get generic destination-flavoured demo suggestions so
+  // the whole flow is testable offline.
+  if (dest && !/lombok/i.test(dest)) {
+    return {
+      text: `Here are a few ideas for ${dest} to get the crew dreaming.` + DEMO_SUFFIX,
+      suggestions: [
+        { title: 'Old town food walk', area: `Central ${dest}`, detail: 'Graze the local classics with a market stop.', price: '$$', kind: 'activity' },
+        { title: 'Boutique stay near the action', area: dest, detail: 'Small, well-reviewed, walkable to the good stuff.', price: '$120/night', kind: 'stay' },
+        { title: 'The locals’ favourite dinner spot', area: dest, detail: 'Book ahead for the early sitting.', kind: 'eat' },
+      ],
+    };
+  }
+
   const rule = RULES.find((r) => r.match.test(query));
   if (rule) {
     return { ...rule.reply, text: rule.reply.text + DEMO_SUFFIX };

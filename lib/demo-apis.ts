@@ -24,9 +24,9 @@ const dateStore: Record<string, DateOption[]> = {
 
 const boardStore: Record<string, BoardItem[]> = {
   t1: [
-    { id: 'b1', title: 'Cliffside sunset dinners', note: 'Ashtari-style, golden hour', tint: '#c77f6a', who: 'c' },
-    { id: 'b2', title: 'Turquoise snorkel bays', tint: '#7fa0c0', who: 'j' },
-    { id: 'b3', title: 'Slow mornings, hammocks', note: 'No alarms allowed', tint: '#9aa56a', who: 'c' },
+    { id: 'b1', kind: 'idea', title: 'Cliffside sunset dinners', note: 'Ashtari-style, golden hour', tint: '#c77f6a', who: 'c' },
+    { id: 'b2', kind: 'note', title: 'No alarms. No laptops. Sarongs mandatory.', tint: '#cf9a5e', who: 'j' },
+    { id: 'b3', kind: 'idea', title: 'Turquoise snorkel bays', tint: '#7fa0c0', who: 'j' },
   ],
 };
 
@@ -78,10 +78,18 @@ export const demoBoardApi: BoardApi = {
     await wait();
     return [...(boardStore[tripId] ?? [])];
   },
-  async add(tripId, _groupId, { title, note, tint }) {
+  async add(tripId, _groupId, { kind, title, note, tint, imageFile }) {
     await wait();
     const list = boardStore[tripId] ?? (boardStore[tripId] = []);
-    list.unshift({ id: `b${Date.now()}`, title, note, tint, who: DEMO_USER });
+    list.unshift({
+      id: `b${Date.now()}`,
+      kind,
+      title,
+      note,
+      tint,
+      who: DEMO_USER,
+      imageUrl: kind === 'photo' && imageFile ? URL.createObjectURL(imageFile) : undefined,
+    });
   },
   async remove(itemId) {
     await wait();

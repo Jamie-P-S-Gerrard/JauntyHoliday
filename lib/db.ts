@@ -222,30 +222,49 @@ export const dbBoardApi: BoardApi = {
     const supabase = createClient();
     const { data, error } = await supabase
       .from('mood_board_items')
-      .select('id, title, note, tint, who')
+      .select('id, kind, title, note, tint, who, image_url')
       .eq('trip_id', tripId)
       .order('created_at', { ascending: false });
     if (error) throw error;
     return (data ?? []).map((i): BoardItem => ({
       id: i.id,
+      kind: (i.kind ?? 'idea') as BoardItem['kind'],
       title: i.title,
       note: i.note ?? undefined,
       tint: i.tint ?? '#caa37a',
       who: i.who ?? '',
+      imageUrl: i.image_url ?? undefined,
     }));
   },
 
-  async add(tripId, groupId, { title, note, tint }) {
+  async add(tripId, groupId, { kind, title, note, tint, imageFile }) {
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not signed in');
+
+    let imageUrl: string | null = null;
+    if (kind === 'photo' && imageFile) {
+      if (imageFile.size > 8 * 1024 * 1024) {
+        throw new Error('Photo is too large — keep it under 8MB');
+      }
+      const ext = imageFile.name.split('.').pop()?.toLowerCase() || 'jpg';
+      const path = `${tripId}/${crypto.randomUUID()}.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from('board')
+        .upload(path, imageFile, { contentType: imageFile.type || 'image/jpeg' });
+      if (uploadError) throw uploadError;
+      imageUrl = supabase.storage.from('board').getPublicUrl(path).data.publicUrl;
+    }
+
     const { error } = await supabase.from('mood_board_items').insert({
       trip_id: tripId,
       group_id: groupId,
+      kind,
       title,
       note: note || null,
       tint,
       who: user.id,
+      image_url: imageUrl,
     });
     if (error) throw error;
   },
