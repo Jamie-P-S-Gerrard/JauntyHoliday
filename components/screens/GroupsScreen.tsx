@@ -90,7 +90,7 @@ function GroupCard({ group, onOpen }: { group: Group; onOpen: () => void }) {
             {group.name}
           </p>
           <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.75)', marginTop: 2 }}>
-            {group.dest} · {group.when}
+            {[group.dest || 'Destination TBC', group.when].filter(Boolean).join(' · ')}
           </p>
         </div>
       </div>
@@ -124,6 +124,8 @@ function StatusChip({ status }: { status: Group['status'] }) {
 
 function CreateSheet({ open, onClose, onCreate }: { open: boolean; onClose: () => void; onCreate: (g: Group) => void }) {
   const [name, setName] = useState('');
+  const [dest, setDest] = useState('');
+  const [when, setWhen] = useState('');
   const [email, setEmail] = useState('');
   const [invited, setInvited] = useState<string[]>([]);
 
@@ -136,23 +138,37 @@ function CreateSheet({ open, onClose, onCreate }: { open: boolean; onClose: () =
   const handleCreate = () => {
     if (!name.trim()) return;
     const g: Group = {
-      id: `g${Date.now()}`, name: name.trim(), dest: '', when: '',
+      id: `g${Date.now()}`, name: name.trim(), dest: dest.trim(), when: when.trim(),
       members: ['j'], invited, inviteCode: Math.random().toString(36).slice(2, 8).toUpperCase(),
       ready: false, status: 'Planning', tint: '#9aa56a',
     };
     onCreate(g);
-    setName(''); setEmail(''); setInvited([]);
+    setName(''); setDest(''); setWhen(''); setEmail(''); setInvited([]);
   };
 
   return (
     <Sheet open={open} onClose={onClose}>
-      <h2 className="sec-title" style={{ marginBottom: 20 }}>New group</h2>
+      <h2 className="sec-title" style={{ marginBottom: 20 }}>New trip group</h2>
       <label style={{ fontSize: 13, color: 'var(--ink-soft)', display: 'block', marginBottom: 6 }}>Group name</label>
       <input
         className="input"
         placeholder="e.g. Bali 2026 or The Crew"
         value={name}
         onChange={(e) => setName(e.target.value)}
+      />
+      <label style={{ fontSize: 13, color: 'var(--ink-soft)', display: 'block', margin: '16px 0 6px' }}>Where to? <span style={{ color: 'var(--ink-faint)' }}>(you can decide later)</span></label>
+      <input
+        className="input"
+        placeholder="e.g. Lombok, Indonesia"
+        value={dest}
+        onChange={(e) => setDest(e.target.value)}
+      />
+      <label style={{ fontSize: 13, color: 'var(--ink-soft)', display: 'block', margin: '16px 0 6px' }}>Roughly when?</label>
+      <input
+        className="input"
+        placeholder="e.g. Oct 2026"
+        value={when}
+        onChange={(e) => setWhen(e.target.value)}
       />
       <label style={{ fontSize: 13, color: 'var(--ink-soft)', display: 'block', margin: '16px 0 6px' }}>Invite by email</label>
       <div style={{ display: 'flex', gap: 8 }}>

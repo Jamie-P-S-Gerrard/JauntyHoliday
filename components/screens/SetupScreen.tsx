@@ -60,6 +60,11 @@ export function SetupScreen({ group, onBack, onGo }: SetupScreenProps) {
         <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'flex-end', padding: 16 }}>
           <div>
             <p style={{ fontFamily: 'var(--serif)', fontSize: 20, fontWeight: 500, color: '#fff' }}>{group.name}</p>
+            {(group.dest || group.when) && (
+              <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.85)', marginTop: 2 }}>
+                {[group.dest, group.when].filter(Boolean).join(' · ')}
+              </p>
+            )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
               <AvatarStack userIds={group.members} size="sm" />
               <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)' }}>

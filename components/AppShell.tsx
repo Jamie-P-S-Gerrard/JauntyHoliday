@@ -140,6 +140,8 @@ export function AppShell() {
               {tab === 'home' && (
                 <HomeScreen
                   groupName={activeGroup?.name ?? ''}
+                  dest={activeGroup?.id === 'g1' ? undefined : activeGroup?.dest || undefined}
+                  when={activeGroup?.when || undefined}
                   onSwitch={() => setStage('groups')}
                   go={setTab}
                 />

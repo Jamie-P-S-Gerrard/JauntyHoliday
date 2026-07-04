@@ -8,6 +8,8 @@ import type { AppTab } from '@/types';
 
 interface HomeScreenProps {
   groupName: string;
+  dest?: string;
+  when?: string;
   onSwitch: () => void;
   go: (tab: AppTab) => void;
 }
@@ -19,7 +21,7 @@ const MILESTONES = [
   { id: 'activities', label: 'Activities',  icon: 'waves',    done: false, sub: '6 saved' },
 ];
 
-export function HomeScreen({ groupName, onSwitch, go }: HomeScreenProps) {
+export function HomeScreen({ groupName, dest, when, onSwitch, go }: HomeScreenProps) {
   const [feed, setFeed] = useState(
     FEED.map((f) => ({ ...f, liked: false, likes: (f.react as number | undefined) ?? 0 }))
   );
@@ -47,10 +49,23 @@ export function HomeScreen({ groupName, onSwitch, go }: HomeScreenProps) {
           </button>
           <AvatarStack userIds={['c', 'j']} size="lg" />
         </div>
-        <h1 className="hdr-title" style={{ marginTop: 4 }}>
-          10 days in <em>{TRIP.place}</em>
-        </h1>
-        <p className="hdr-sub">{TRIP.dates.label}, {TRIP.dates.year} · {TRIP.dates.nights} nights</p>
+        {/* Groups with their own destination show it; the demo group keeps
+            the sample Lombok header until real trip data is wired up */}
+        {dest ? (
+          <>
+            <h1 className="hdr-title" style={{ marginTop: 4 }}>
+              Next stop: <em>{dest}</em>
+            </h1>
+            <p className="hdr-sub">{when || 'Dates to be decided'} · sample plan below</p>
+          </>
+        ) : (
+          <>
+            <h1 className="hdr-title" style={{ marginTop: 4 }}>
+              10 days in <em>{TRIP.place}</em>
+            </h1>
+            <p className="hdr-sub">{TRIP.dates.label}, {TRIP.dates.year} · {TRIP.dates.nights} nights</p>
+          </>
+        )}
       </div>
 
       <div className="scroll-area" style={{ padding: '16px var(--pad) 0' }}>
