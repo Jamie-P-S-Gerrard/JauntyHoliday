@@ -1,7 +1,8 @@
 // In-memory implementations of the dates + mood board APIs for demo mode
 // (no Supabase configured). State survives navigation but not a refresh.
-import { formatRange, formatSub } from './dates';
-import type { BoardApi, BoardItem, DateOption, DatesApi } from '@/types';
+import { dateRange, formatDayLabel, formatRange, formatSub } from './dates';
+import { DAYS } from './data';
+import type { BoardApi, BoardItem, DateOption, DatesApi, Day, ItineraryApi, Stay, StaysApi } from '@/types';
 
 const DEMO_USER = 'j';
 
@@ -95,6 +96,98 @@ export const demoBoardApi: BoardApi = {
     await wait();
     for (const key of Object.keys(boardStore)) {
       boardStore[key] = boardStore[key].filter((x) => x.id !== itemId);
+    }
+  },
+};
+
+// ── Itinerary (demo) ──────────────────────────────────────────────────────────
+
+const dayStore: Record<string, Day[]> = {
+  t1: DAYS.map((d) => ({ ...d, items: [...d.items] })),
+};
+
+export const demoItineraryApi: ItineraryApi = {
+  async listDays(tripId) {
+    await wait();
+    return (dayStore[tripId] ?? []).map((d) => ({ ...d, items: [...d.items] }));
+  },
+  async setupDays(tripId, _groupId, start, end) {
+    await wait();
+    const dates = dateRange(start, end);
+    dayStore[tripId] = dates.map((iso, i) => ({
+      id: `day-${tripId}-${i + 1}`,
+      n: i + 1,
+      date: formatDayLabel(iso),
+      title: i === 0 ? 'Arrival day' : i === dates.length - 1 ? 'Heading home' : `Day ${i + 1}`,
+      area: '',
+      items: [],
+    }));
+  },
+  async addItem(dayId, { time, title, place, cat }) {
+    await wait();
+    for (const days of Object.values(dayStore)) {
+      const day = days.find((d) => d.id === dayId);
+      if (day) {
+        day.items.push({
+          id: `i${Date.now()}`, t: time || '–', title, place: place ?? '',
+          cat, who: DEMO_USER, likes: 0, liked: false, comments: 0,
+        });
+        day.items.sort((a, b) => (a.t === '–' ? '99:99' : a.t).localeCompare(b.t === '–' ? '99:99' : b.t));
+      }
+    }
+  },
+  async removeItem(itemId) {
+    await wait();
+    for (const days of Object.values(dayStore)) {
+      for (const day of days) {
+        day.items = day.items.filter((i) => i.id !== itemId);
+      }
+    }
+  },
+  async toggleLike(itemId, liked) {
+    await wait();
+    for (const days of Object.values(dayStore)) {
+      for (const day of days) {
+        const item = day.items.find((i) => i.id === itemId);
+        if (item) {
+          item.liked = !liked;
+          item.likes += liked ? -1 : 1;
+        }
+      }
+    }
+  },
+};
+
+// ── Stays (demo) ──────────────────────────────────────────────────────────────
+
+const stayStore: Record<string, Stay[]> = {
+  t1: [
+    { id: 's1', title: 'Ashtari Hillside Villa', area: 'Kuta · ocean view', cost: 940, status: 'booked', who: 'c' },
+    { id: 's2', title: 'Gili Air beach bungalow', area: 'Gili Air · nights 7–9', cost: 210, status: 'pending', who: 'j' },
+  ],
+};
+
+export const demoStaysApi: StaysApi = {
+  async list(tripId) {
+    await wait();
+    return [...(stayStore[tripId] ?? [])];
+  },
+  async add(tripId, _groupId, input) {
+    await wait();
+    const list = stayStore[tripId] ?? (stayStore[tripId] = []);
+    list.push({ id: `s${Date.now()}`, ...input, who: DEMO_USER });
+  },
+  async setStatus(stayId, status) {
+    await wait();
+    for (const list of Object.values(stayStore)) {
+      const s = list.find((x) => x.id === stayId);
+      if (s) s.status = status;
+    }
+  },
+  async remove(stayId) {
+    await wait();
+    for (const key of Object.keys(stayStore)) {
+      stayStore[key] = stayStore[key].filter((x) => x.id !== stayId);
     }
   },
 };

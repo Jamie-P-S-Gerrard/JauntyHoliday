@@ -1,10 +1,11 @@
 // Supabase data access. Every function assumes supabaseConfigured() is true —
 // AppShell routes to the demo implementations in lib/demo-apis.ts otherwise.
 import { createClient } from './supabase/client';
-import { formatRange, formatSub } from './dates';
+import { dateRange, formatDayLabel, formatRange, formatSub } from './dates';
 import type {
   Group, GroupPrefs, TripSummary, TripStatus,
   DateOption, DatesApi, BoardItem, BoardApi,
+  Day, ItineraryApi, Stay, StaysApi, StayStatus,
 } from '@/types';
 
 const TRIP_TINTS = ['#caa37a', '#7fa0c0', '#9aa56a', '#b07a9a', '#c77f6a', '#7fa39a'];
@@ -272,6 +273,161 @@ export const dbBoardApi: BoardApi = {
   async remove(itemId) {
     const supabase = createClient();
     const { error } = await supabase.from('mood_board_items').delete().eq('id', itemId);
+    if (error) throw error;
+  },
+};
+
+// ── Itinerary ─────────────────────────────────────────────────────────────────
+
+export const dbItineraryApi: ItineraryApi = {
+  async listDays(tripId) {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    const { data, error } = await supabase
+      .from('days')
+      .select('id, day_number, date_label, title, area, itinerary_items ( id, time_label, title, place, cat, who, sort_order, item_likes ( user_id ) )')
+      .eq('trip_id', tripId)
+      .order('day_number', { ascending: true });
+    if (error) throw error;
+    return (data ?? []).map((d): Day => ({
+      id: d.id,
+      n: d.day_number,
+      date: d.date_label ?? '',
+      title: d.title ?? `Day ${d.day_number}`,
+      area: d.area ?? '',
+      items: (d.itinerary_items ?? [])
+        .sort((a: { sort_order: number | null; time_label: string | null }, b: { sort_order: number | null; time_label: string | null }) =>
+          (a.time_label ?? '99:99').localeCompare(b.time_label ?? '99:99'))
+        .map((i: { id: string; time_label: string | null; title: string; place: string | null; cat: string | null; who: string | null; item_likes: Array<{ user_id: string }> }) => ({
+          id: i.id,
+          t: i.time_label ?? '–',
+          title: i.title,
+          place: i.place ?? '',
+          cat: (i.cat ?? 'activity') as Day['items'][number]['cat'],
+          who: i.who ?? '',
+          likes: (i.item_likes ?? []).length,
+          liked: !!user && (i.item_likes ?? []).some((l: { user_id: string }) => l.user_id === user.id),
+          comments: 0,
+        })),
+    }));
+  },
+
+  async setupDays(tripId, groupId, start, end) {
+    const supabase = createClient();
+    const dates = dateRange(start, end);
+    if (dates.length === 0) throw new Error('Pick a valid date range');
+    const rows = dates.map((iso, i) => ({
+      trip_id: tripId,
+      group_id: groupId,
+      day_number: i + 1,
+      date_label: formatDayLabel(iso),
+      title: i === 0 ? 'Arrival day' : i === dates.length - 1 ? 'Heading home' : null,
+    }));
+    const { error } = await supabase.from('days').insert(rows);
+    if (error) throw error;
+  },
+
+  async addItem(dayId, { time, title, place, cat }) {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not signed in');
+    const { error } = await supabase.from('itinerary_items').insert({
+      day_id: dayId,
+      time_label: time || null,
+      title,
+      place: place || null,
+      cat,
+      who: user.id,
+    });
+    if (error) throw error;
+  },
+
+  async removeItem(itemId) {
+    const supabase = createClient();
+    const { error } = await supabase.from('itinerary_items').delete().eq('id', itemId);
+    if (error) throw error;
+  },
+
+  async toggleLike(itemId, liked) {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not signed in');
+    if (liked) {
+      const { error } = await supabase.from('item_likes').delete()
+        .eq('item_id', itemId).eq('user_id', user.id);
+      if (error) throw error;
+    } else {
+      const { error } = await supabase.from('item_likes').insert({ item_id: itemId, user_id: user.id });
+      if (error && error.code !== '23505') throw error;
+    }
+  },
+};
+
+// ── Stays (accommodation shortlist backed by budgets/bookings) ────────────────
+
+async function getOrCreateBudget(tripId: string, groupId: string): Promise<string> {
+  const supabase = createClient();
+  const { data: existing, error } = await supabase
+    .from('budgets').select('id').eq('trip_id', tripId).maybeSingle();
+  if (error) throw error;
+  if (existing) return existing.id;
+  const { data: created, error: insertError } = await supabase
+    .from('budgets')
+    .insert({ trip_id: tripId, group_id: groupId })
+    .select('id')
+    .single();
+  if (insertError) throw insertError;
+  return created.id;
+}
+
+export const dbStaysApi: StaysApi = {
+  async list(tripId) {
+    const supabase = createClient();
+    const { data: budget, error: budgetError } = await supabase
+      .from('budgets').select('id').eq('trip_id', tripId).maybeSingle();
+    if (budgetError) throw budgetError;
+    if (!budget) return [];
+    const { data, error } = await supabase
+      .from('bookings')
+      .select('id, title, meta, cost, status, who')
+      .eq('budget_id', budget.id)
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    return (data ?? []).map((b): Stay => ({
+      id: b.id,
+      title: b.title,
+      area: b.meta ?? undefined,
+      cost: b.cost ?? undefined,
+      status: (b.status ?? 'todo') as StayStatus,
+      who: b.who,
+    }));
+  },
+
+  async add(tripId, groupId, { title, area, cost, status }) {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not signed in');
+    const budgetId = await getOrCreateBudget(tripId, groupId);
+    const { error } = await supabase.from('bookings').insert({
+      budget_id: budgetId,
+      title,
+      meta: area || null,
+      cost: cost ?? null,
+      status,
+      who: user.id,
+    });
+    if (error) throw error;
+  },
+
+  async setStatus(stayId, status) {
+    const supabase = createClient();
+    const { error } = await supabase.from('bookings').update({ status }).eq('id', stayId);
+    if (error) throw error;
+  },
+
+  async remove(stayId) {
+    const supabase = createClient();
+    const { error } = await supabase.from('bookings').delete().eq('id', stayId);
     if (error) throw error;
   },
 };

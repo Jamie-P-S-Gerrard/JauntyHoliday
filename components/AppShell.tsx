@@ -14,11 +14,15 @@ import { BudgetScreen } from './screens/BudgetScreen';
 import { INIT_GROUPS, registerProfiles } from '@/lib/data';
 import { createClient } from '@/lib/supabase/client';
 import { supabaseConfigured } from '@/lib/supabase/configured';
+import { RealTripHome } from './screens/RealTripHome';
 import {
   fetchGroups, createGroupDb, joinGroupDb, createTripDb,
   markTripReadyDb, savePrefsDb, dbDatesApi, dbBoardApi,
+  dbItineraryApi, dbStaysApi,
 } from '@/lib/db';
-import { demoDatesApi, demoBoardApi } from '@/lib/demo-apis';
+import {
+  demoDatesApi, demoBoardApi, demoItineraryApi, demoStaysApi,
+} from '@/lib/demo-apis';
 import type { AppStage, AppTab, Group, GroupPrefs, TripSummary } from '@/types';
 
 export function AppShell() {
@@ -36,6 +40,8 @@ export function AppShell() {
 
   const datesApi = configured ? dbDatesApi : demoDatesApi;
   const boardApi = configured ? dbBoardApi : demoBoardApi;
+  const itinApi = configured ? dbItineraryApi : demoItineraryApi;
+  const staysApi = configured ? dbStaysApi : demoStaysApi;
 
   const activeGroup = groups.find((g) => g.id === activeGroupId) ?? null;
   const activeTrip = activeGroup?.trips.find((t) => t.id === activeTripId) ?? null;
@@ -280,13 +286,30 @@ export function AppShell() {
           {inTrip && activeGroup && activeTrip && (
             <>
               {tab === 'home' && (
-                <HomeScreen
-                  groupName={activeGroup.name}
-                  dest={activeTrip.id === 't1' ? undefined : activeTrip.dest || undefined}
-                  when={activeTrip.when || undefined}
-                  onSwitch={() => setStage('group')}
-                  go={setTab}
-                />
+                activeTrip.id === 't1' ? (
+                  // The seeded Lombok demo keeps its full sample home screen
+                  <HomeScreen
+                    groupName={activeGroup.name}
+                    onSwitch={() => setStage('group')}
+                    go={setTab}
+                  />
+                ) : (
+                  <RealTripHome
+                    key={activeTrip.id}
+                    groupName={activeGroup.name}
+                    dest={activeTrip.dest || 'Somewhere new'}
+                    when={activeTrip.when || undefined}
+                    tint={activeTrip.tint}
+                    members={activeGroup.members}
+                    tripId={activeTrip.id}
+                    groupId={activeGroup.id}
+                    userId={userId}
+                    staysApi={staysApi}
+                    itinApi={itinApi}
+                    onSwitch={() => setStage('group')}
+                    go={setTab}
+                  />
+                )
               )}
               {tab === 'dates' && (
                 <DatesScreen
@@ -311,11 +334,12 @@ export function AppShell() {
               )}
               {tab === 'plan' && (
                 <PlanScreen
-                  saved={saved}
+                  key={activeTrip.id}
                   tripId={activeTrip.id}
                   groupId={activeGroup.id}
                   userId={userId}
                   boardApi={boardApi}
+                  itinApi={itinApi}
                 />
               )}
               {tab === 'budget' && <BudgetScreen />}

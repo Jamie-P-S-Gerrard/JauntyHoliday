@@ -158,11 +158,38 @@ export interface ItineraryItem {
 }
 
 export interface Day {
+  id: string;
   n: number;
   date: string;
   title: string;
   area: string;
   items: ItineraryItem[];
+}
+
+export interface ItineraryApi {
+  listDays(tripId: string): Promise<Day[]>;
+  setupDays(tripId: string, groupId: string, start: string, end: string): Promise<void>;
+  addItem(dayId: string, input: { time?: string; title: string; place?: string; cat: ItineraryItemCat }): Promise<void>;
+  removeItem(itemId: string): Promise<void>;
+  toggleLike(itemId: string, liked: boolean): Promise<void>;
+}
+
+export type StayStatus = 'todo' | 'pending' | 'booked';
+
+export interface Stay {
+  id: string;
+  title: string;
+  area?: string;
+  cost?: number;
+  status: StayStatus;
+  who: UserId | null;
+}
+
+export interface StaysApi {
+  list(tripId: string): Promise<Stay[]>;
+  add(tripId: string, groupId: string, input: { title: string; area?: string; cost?: number; status: StayStatus }): Promise<void>;
+  setStatus(stayId: string, status: StayStatus): Promise<void>;
+  remove(stayId: string): Promise<void>;
 }
 
 export type SideTripType = 'solo' | 'open';

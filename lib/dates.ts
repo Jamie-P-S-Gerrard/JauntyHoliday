@@ -26,6 +26,24 @@ export function formatSub(startIso: string, endIso: string): string {
   return `${DOW[s.getDay()]} → ${DOW[e.getDay()]} · ${nights} ${nights === 1 ? 'night' : 'nights'}`;
 }
 
+// "Oct 3"
+export function formatDayLabel(iso: string): string {
+  const d = parse(iso);
+  return `${MONTHS[d.getMonth()]} ${d.getDate()}`;
+}
+
+// ISO dates from start to end inclusive
+export function dateRange(startIso: string, endIso: string): string[] {
+  const out: string[] = [];
+  const d = parse(startIso);
+  const end = parse(endIso);
+  while (d.getTime() <= end.getTime() && out.length < 60) {
+    out.push(d.toISOString().slice(0, 10));
+    d.setDate(d.getDate() + 1);
+  }
+  return out;
+}
+
 export function monthTitle(iso: string): string {
   const d = parse(iso);
   return `${['January','February','March','April','May','June','July','August','September','October','November','December'][d.getMonth()]} ${d.getFullYear()}`;
