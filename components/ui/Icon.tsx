@@ -5,7 +5,7 @@ import {
   ChevronDown, MapPin, Star, Sun, Moon, Plane, BedDouble,
   Utensils, Waves, Search, Send, Mail, File, Paperclip,
   X, Users, Share2, Copy, ArrowLeft, Clock, Camera,
-  Flame, Dumbbell, Bike, Ship,
+  Flame, Dumbbell, Bike, Ship, Pencil, History,
 } from 'lucide-react';
 import type { LucideProps } from 'lucide-react';
 
@@ -19,7 +19,7 @@ const ICONS: Record<string, React.ComponentType<LucideProps>> = {
   mail: Mail, file: File, paperclip: Paperclip, x: X,
   users: Users, share: Share2, copy: Copy, 'arrow-left': ArrowLeft,
   clock: Clock, camera: Camera, flame: Flame, dumbbell: Dumbbell,
-  bike: Bike, ship: Ship,
+  bike: Bike, ship: Ship, edit: Pencil, history: History,
 };
 
 interface IconProps {

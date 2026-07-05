@@ -40,6 +40,7 @@ export function RealTripHome({
   const [stays, setStays] = useState<Stay[]>([]);
   const [days, setDays] = useState<Day[]>([]);
   const [addStayOpen, setAddStayOpen] = useState(false);
+  const [editStay, setEditStay] = useState<Stay | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -132,12 +133,12 @@ export function RealTripHome({
               }}>
                 <Icon name="bed" size={17} color="var(--olive)" />
               </div>
-              <div style={{ minWidth: 0 }}>
+              <button style={{ minWidth: 0, textAlign: 'left', flex: 1 }} onClick={() => setEditStay(s)} aria-label={'Edit ' + s.title}>
                 <p style={{ fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.title}</p>
                 <p style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 1 }}>
-                  {[s.area, s.cost ? `$${s.cost}` : null].filter(Boolean).join(' · ') || '—'}
+                  {[s.area, s.cost ? '$' + s.cost : null].filter(Boolean).join(' · ') || 'Tap to edit'}
                 </p>
-              </div>
+              </button>
               <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
                 <button
                   className={`chip ${STATUS_META[s.status].cls}`}
@@ -194,19 +195,24 @@ export function RealTripHome({
       />
 
       <AddStaySheet
-        open={addStayOpen}
-        onClose={() => setAddStayOpen(false)}
+        open={addStayOpen || !!editStay}
+        initial={editStay}
+        onClose={() => { setAddStayOpen(false); setEditStay(null); }}
         onAdd={(input) => {
+          const editingId = editStay?.id;
           setAddStayOpen(false);
-          run(() => staysApi.add(tripId, groupId, input));
+          setEditStay(null);
+          run(() => (editingId
+            ? staysApi.update(editingId, { title: input.title, area: input.area, cost: input.cost })
+            : staysApi.add(tripId, groupId, input)));
         }}
       />
     </div>
   );
 }
 
-function AddStaySheet({ open, onClose, onAdd }: {
-  open: boolean; onClose: () => void;
+function AddStaySheet({ open, initial, onClose, onAdd }: {
+  open: boolean; initial?: Stay | null; onClose: () => void;
   onAdd: (input: { title: string; area?: string; cost?: number; status: StayStatus }) => void;
 }) {
   const [title, setTitle] = useState('');
@@ -214,9 +220,17 @@ function AddStaySheet({ open, onClose, onAdd }: {
   const [cost, setCost] = useState('');
   const [status, setStatus] = useState<StayStatus>('todo');
 
+  useEffect(() => {
+    if (!open) return;
+    setTitle(initial?.title ?? '');
+    setArea(initial?.area ?? '');
+    setCost(initial?.cost != null ? String(initial.cost) : '');
+    setStatus(initial?.status ?? 'todo');
+  }, [open, initial]);
+
   return (
     <Sheet open={open} onClose={onClose}>
-      <h2 className="sec-title" style={{ marginBottom: 20 }}>Add a stay</h2>
+      <h2 className="sec-title" style={{ marginBottom: 20 }}>{initial ? 'Edit stay' : 'Add a stay'}</h2>
       <label style={{ fontSize: 13, color: 'var(--ink-soft)', display: 'block', marginBottom: 6 }}>Name</label>
       <input className="input" placeholder="e.g. Ashtari Hillside Villa" value={title} autoFocus onChange={(e) => setTitle(e.target.value)} />
 
@@ -231,14 +245,18 @@ function AddStaySheet({ open, onClose, onAdd }: {
         </div>
       </div>
 
-      <label style={{ fontSize: 13, color: 'var(--ink-soft)', display: 'block', margin: '14px 0 8px' }}>Status</label>
-      <div style={{ display: 'flex', gap: 6 }}>
-        {(Object.keys(STATUS_META) as StayStatus[]).map((st) => (
-          <button key={st} className={`chip${status === st ? ' on' : ''}`} onClick={() => setStatus(st)}>
-            {STATUS_META[st].label}
-          </button>
-        ))}
-      </div>
+      {!initial && (
+        <>
+          <label style={{ fontSize: 13, color: 'var(--ink-soft)', display: 'block', margin: '14px 0 8px' }}>Status</label>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {(Object.keys(STATUS_META) as StayStatus[]).map((st) => (
+              <button key={st} className={`chip${status === st ? ' on' : ''}`} onClick={() => setStatus(st)}>
+                {STATUS_META[st].label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
 
       <button
         className="btn"
@@ -254,7 +272,7 @@ function AddStaySheet({ open, onClose, onAdd }: {
           setTitle(''); setArea(''); setCost(''); setStatus('todo');
         }}
       >
-        Add stay
+        {initial ? 'Save changes' : 'Add stay'}
       </button>
     </Sheet>
   );

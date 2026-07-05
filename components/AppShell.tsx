@@ -19,10 +19,10 @@ import { RealTripHome } from './screens/RealTripHome';
 import {
   fetchGroups, createGroupDb, joinGroupDb, createTripDb,
   markTripReadyDb, savePrefsDb, dbDatesApi, dbBoardApi,
-  dbItineraryApi, dbStaysApi, dbEventsApi, dbChatApi,
+  dbItineraryApi, dbStaysApi, dbEventsApi, dbChatApi, dbHistoryApi,
 } from '@/lib/db';
 import {
-  demoDatesApi, demoBoardApi, demoItineraryApi, demoStaysApi, demoEventsApi, demoChatApi,
+  demoDatesApi, demoBoardApi, demoItineraryApi, demoStaysApi, demoEventsApi, demoChatApi, demoHistoryApi,
 } from '@/lib/demo-apis';
 import type { AppStage, AppTab, Group, GroupPrefs, TripSummary } from '@/types';
 
@@ -45,6 +45,7 @@ export function AppShell() {
   const staysApi = configured ? dbStaysApi : demoStaysApi;
   const eventsApi = configured ? dbEventsApi : demoEventsApi;
   const chatApi = configured ? dbChatApi : demoChatApi;
+  const historyApi = configured ? dbHistoryApi : demoHistoryApi;
 
   const activeGroup = groups.find((g) => g.id === activeGroupId) ?? null;
   const activeTrip = activeGroup?.trips.find((t) => t.id === activeTripId) ?? null;
@@ -273,6 +274,7 @@ export function AppShell() {
               userId={userId}
               eventsApi={eventsApi}
               chatApi={chatApi}
+              historyApi={historyApi}
               onBack={() => setStage('groups')}
               onOpenTrip={openTrip}
               onCreateTrip={createTrip}

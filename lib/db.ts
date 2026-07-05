@@ -6,7 +6,8 @@ import type {
   Group, GroupPrefs, TripSummary, TripStatus,
   DateOption, DatesApi, BoardItem, BoardApi,
   Day, ItineraryApi, Stay, StaysApi, StayStatus,
-  GroupEvent, EventsApi, ChatApi, ChatMsg,
+  GroupEvent, EventsApi, ChatApi, ChatMsg, EventPart, EventInput,
+  ChangeEntry, HistoryApi,
 } from '@/types';
 
 const TRIP_TINTS = ['#caa37a', '#7fa0c0', '#9aa56a', '#b07a9a', '#c77f6a', '#7fa39a'];
@@ -343,6 +344,17 @@ export const dbItineraryApi: ItineraryApi = {
     if (error) throw error;
   },
 
+  async updateItem(itemId, { time, title, place, cat }) {
+    const supabase = createClient();
+    const { error } = await supabase.from('itinerary_items').update({
+      time_label: time || null,
+      title,
+      place: place || null,
+      cat,
+    }).eq('id', itemId);
+    if (error) throw error;
+  },
+
   async removeItem(itemId) {
     const supabase = createClient();
     const { error } = await supabase.from('itinerary_items').delete().eq('id', itemId);
@@ -420,6 +432,16 @@ export const dbStaysApi: StaysApi = {
     if (error) throw error;
   },
 
+  async update(stayId, { title, area, cost }) {
+    const supabase = createClient();
+    const { error } = await supabase.from('bookings').update({
+      title,
+      meta: area || null,
+      cost: cost ?? null,
+    }).eq('id', stayId);
+    if (error) throw error;
+  },
+
   async setStatus(stayId, status) {
     const supabase = createClient();
     const { error } = await supabase.from('bookings').update({ status }).eq('id', stayId);
@@ -440,7 +462,7 @@ export const dbEventsApi: EventsApi = {
     const supabase = createClient();
     const { data, error } = await supabase
       .from('events')
-      .select('id, title, event_date, time_label, note, venue, venue_url, ticket_url, tint, created_by, event_rsvps ( user_id )')
+      .select('id, title, event_date, time_label, note, venue, venue_url, ticket_url, tint, created_by, event_rsvps ( user_id ), event_parts ( id, seq, title, time_label, venue, venue_url, ticket_url )')
       .eq('group_id', groupId)
       .order('event_date', { ascending: true, nullsFirst: false });
     if (error) throw error;
@@ -456,6 +478,16 @@ export const dbEventsApi: EventsApi = {
       tint: e.tint ?? '#b07a9a',
       who: e.created_by ?? '',
       going: (e.event_rsvps ?? []).map((r: { user_id: string }) => r.user_id),
+      parts: (e.event_parts ?? [])
+        .sort((a: { seq: number | null }, b: { seq: number | null }) => (a.seq ?? 0) - (b.seq ?? 0))
+        .map((p: { id: string; title: string; time_label: string | null; venue: string | null; venue_url: string | null; ticket_url: string | null }): EventPart => ({
+          id: p.id,
+          title: p.title,
+          time: p.time_label ?? undefined,
+          venue: p.venue ?? undefined,
+          venueUrl: p.venue_url ?? undefined,
+          ticketUrl: p.ticket_url ?? undefined,
+        })),
     }));
   },
 
@@ -477,6 +509,24 @@ export const dbEventsApi: EventsApi = {
     if (error) throw error;
     // Proposer is automatically in
     await supabase.from('event_rsvps').insert({ event_id: event.id, user_id: user.id });
+    if (input.parts && input.parts.length > 0) {
+      await syncEventParts(event.id, input.parts);
+    }
+  },
+
+  async update(eventId, input) {
+    const supabase = createClient();
+    const { error } = await supabase.from('events').update({
+      title: input.title,
+      event_date: input.date || null,
+      time_label: input.time || null,
+      note: input.note || null,
+      venue: input.venue || null,
+      venue_url: input.venueUrl || null,
+      ticket_url: input.ticketUrl || null,
+    }).eq('id', eventId);
+    if (error) throw error;
+    await syncEventParts(eventId, input.parts ?? []);
   },
 
   async rsvp(eventId, going) {
@@ -499,6 +549,39 @@ export const dbEventsApi: EventsApi = {
     if (error) throw error;
   },
 };
+
+// Diff-sync an event's parts: update kept ones, insert new, delete removed —
+// keeps the change history readable (edits log as updates, not churn).
+async function syncEventParts(eventId: string, parts: EventPart[]): Promise<void> {
+  const supabase = createClient();
+  const { data: existing, error } = await supabase
+    .from('event_parts').select('id').eq('event_id', eventId);
+  if (error) throw error;
+  const keptIds = new Set(parts.filter((p) => p.id).map((p) => p.id));
+  const toDelete = (existing ?? []).filter((r) => !keptIds.has(r.id)).map((r) => r.id);
+  if (toDelete.length > 0) {
+    const { error: delError } = await supabase.from('event_parts').delete().in('id', toDelete);
+    if (delError) throw delError;
+  }
+  for (let i = 0; i < parts.length; i++) {
+    const p = parts[i];
+    const row = {
+      seq: i + 2, // event itself is part 1
+      title: p.title,
+      time_label: p.time || null,
+      venue: p.venue || null,
+      venue_url: p.venueUrl || null,
+      ticket_url: p.ticketUrl || null,
+    };
+    if (p.id) {
+      const { error: upError } = await supabase.from('event_parts').update(row).eq('id', p.id);
+      if (upError) throw upError;
+    } else {
+      const { error: insError } = await supabase.from('event_parts').insert({ ...row, event_id: eventId });
+      if (insError) throw insError;
+    }
+  }
+}
 
 // ── Chat ──────────────────────────────────────────────────────────────────────
 
@@ -533,5 +616,29 @@ export const dbChatApi: ChatApi = {
       body,
     });
     if (error) throw error;
+  },
+};
+
+// ── History ───────────────────────────────────────────────────────────────────
+
+export const dbHistoryApi: HistoryApi = {
+  async list(groupId) {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from('change_log')
+      .select('id, table_name, action, who, summary, diff, created_at')
+      .eq('group_id', groupId)
+      .order('created_at', { ascending: false })
+      .limit(60);
+    if (error) throw error;
+    return (data ?? []).map((r): ChangeEntry => ({
+      id: r.id,
+      table: r.table_name,
+      action: r.action as ChangeEntry['action'],
+      who: r.who,
+      summary: r.summary ?? undefined,
+      changedFields: r.diff ? Object.keys(r.diff) : [],
+      at: r.created_at,
+    }));
   },
 };

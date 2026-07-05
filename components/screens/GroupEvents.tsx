@@ -6,7 +6,7 @@ import { Sheet } from '@/components/ui/Sheet';
 import { ChatSheet } from '@/components/ui/ChatSheet';
 import { toast } from '@/components/ui/Toast';
 import { formatDayLabel } from '@/lib/dates';
-import type { ChatApi, EventInput, EventsApi, GroupEvent } from '@/types';
+import type { ChatApi, EventInput, EventPart, EventsApi, GroupEvent } from '@/types';
 
 interface GroupEventsProps {
   groupId: string;
@@ -17,7 +17,8 @@ interface GroupEventsProps {
 
 export function GroupEvents({ groupId, userId, api, chatApi }: GroupEventsProps) {
   const [events, setEvents] = useState<GroupEvent[]>([]);
-  const [newOpen, setNewOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [editing, setEditing] = useState<GroupEvent | null>(null);
   const [chatEvent, setChatEvent] = useState<GroupEvent | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -44,11 +45,14 @@ export function GroupEvents({ groupId, userId, api, chatApi }: GroupEventsProps)
     }
   };
 
+  const openCreate = () => { setEditing(null); setSheetOpen(true); };
+  const openEdit = (ev: GroupEvent) => { setEditing(ev); setSheetOpen(true); };
+
   return (
     <>
       <div className="sec-head">
         <p className="eyebrow">Events</p>
-        <button className="btn ghost sm" onClick={() => setNewOpen(true)}>
+        <button className="btn ghost sm" onClick={openCreate}>
           <Icon name="plus" size={14} color="var(--ink)" /> Propose
         </button>
       </div>
@@ -67,7 +71,7 @@ export function GroupEvents({ groupId, userId, api, chatApi }: GroupEventsProps)
                 <div style={{
                   width: 52, minHeight: 52, borderRadius: 12, background: ev.tint,
                   display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                  color: '#fff', flexShrink: 0, padding: '6px 2px',
+                  color: '#fff', flexShrink: 0, padding: '6px 2px', alignSelf: 'flex-start',
                 }}>
                   {ev.date ? (
                     <>
@@ -86,34 +90,42 @@ export function GroupEvents({ groupId, userId, api, chatApi }: GroupEventsProps)
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
                     <p style={{ fontSize: 15, fontWeight: 600 }}>{ev.title}</p>
-                    {ev.who === userId && (
-                      <button onClick={() => run(() => api.remove(ev.id))} aria-label="Remove event" style={{ opacity: 0.45, padding: 2 }}>
-                        <Icon name="x" size={13} color="var(--ink-soft)" />
+                    <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
+                      <button onClick={() => openEdit(ev)} aria-label="Edit event" style={{ opacity: 0.5, padding: 2 }}>
+                        <Icon name="edit" size={13} color="var(--ink-soft)" />
                       </button>
-                    )}
-                  </div>
-                  <p style={{ fontSize: 12.5, color: 'var(--ink-soft)', marginTop: 2 }}>
-                    {[ev.time, ev.venue].filter(Boolean).join(' · ') || 'Details to come'}
-                  </p>
-                  {ev.note && (
-                    <p style={{ fontSize: 12.5, color: 'var(--ink-soft)', marginTop: 6, lineHeight: 1.45 }}>{ev.note}</p>
-                  )}
-
-                  {/* Links */}
-                  {(ev.ticketUrl || ev.venueUrl) && (
-                    <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
-                      {ev.ticketUrl && (
-                        <a className="chip terra" style={{ height: 26, fontSize: 11.5, textDecoration: 'none' }} href={ev.ticketUrl} target="_blank" rel="noreferrer">
-                          <Icon name="file" size={11} color="var(--terra-ink)" /> Tickets
-                        </a>
-                      )}
-                      {ev.venueUrl && (
-                        <a className="chip" style={{ height: 26, fontSize: 11.5, textDecoration: 'none' }} href={ev.venueUrl} target="_blank" rel="noreferrer">
-                          <Icon name="map-pin" size={11} color="var(--ink-soft)" /> Venue
-                        </a>
+                      {ev.who === userId && (
+                        <button onClick={() => run(() => api.remove(ev.id))} aria-label="Remove event" style={{ opacity: 0.45, padding: 2 }}>
+                          <Icon name="x" size={13} color="var(--ink-soft)" />
+                        </button>
                       )}
                     </div>
+                  </div>
+                  {ev.note && (
+                    <p style={{ fontSize: 12.5, color: 'var(--ink-soft)', marginTop: 2, lineHeight: 1.45 }}>{ev.note}</p>
                   )}
+
+                  {/* Parts timeline: the event's own details are part 1 */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
+                    <PartRow
+                      n={1}
+                      title={ev.venue ? `${ev.title} · ${ev.venue}` : ev.title}
+                      time={ev.time}
+                      venueUrl={ev.venueUrl}
+                      ticketUrl={ev.ticketUrl}
+                      only={ev.parts.length === 0}
+                    />
+                    {ev.parts.map((p, i) => (
+                      <PartRow
+                        key={p.id ?? i}
+                        n={i + 2}
+                        title={p.venue ? `${p.title} · ${p.venue}` : p.title}
+                        time={p.time}
+                        venueUrl={p.venueUrl}
+                        ticketUrl={p.ticketUrl}
+                      />
+                    ))}
+                  </div>
                 </div>
               </div>
 
@@ -145,12 +157,13 @@ export function GroupEvents({ groupId, userId, api, chatApi }: GroupEventsProps)
         })}
       </div>
 
-      <NewEventSheet
-        open={newOpen}
-        onClose={() => setNewOpen(false)}
-        onCreate={(input) => {
-          setNewOpen(false);
-          run(() => api.add(groupId, input));
+      <EventSheet
+        open={sheetOpen}
+        event={editing}
+        onClose={() => setSheetOpen(false)}
+        onSave={(input) => {
+          setSheetOpen(false);
+          run(() => (editing ? api.update(editing.id, input) : api.add(groupId, input)));
         }}
       />
 
@@ -168,8 +181,44 @@ export function GroupEvents({ groupId, userId, api, chatApi }: GroupEventsProps)
   );
 }
 
-function NewEventSheet({ open, onClose, onCreate }: {
-  open: boolean; onClose: () => void; onCreate: (input: EventInput) => void;
+function PartRow({ n, title, time, venueUrl, ticketUrl, only }: {
+  n: number; title: string; time?: string;
+  venueUrl?: string; ticketUrl?: string; only?: boolean;
+}) {
+  const hasAnything = time || venueUrl || ticketUrl || !only;
+  if (!hasAnything) return null;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+      {!only && (
+        <span style={{
+          width: 18, height: 18, borderRadius: '50%', background: 'var(--surface-2)',
+          fontSize: 10, fontWeight: 800, color: 'var(--ink-soft)',
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+        }}>
+          {n}
+        </span>
+      )}
+      {time && <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink-soft)', flexShrink: 0 }}>{time}</span>}
+      {!only && <span style={{ fontSize: 12.5, color: 'var(--ink)', minWidth: 0 }}>{title}</span>}
+      {ticketUrl && (
+        <a className="chip terra" style={{ height: 24, fontSize: 11, textDecoration: 'none' }} href={ticketUrl} target="_blank" rel="noreferrer">
+          <Icon name="file" size={10} color="var(--terra-ink)" /> Tickets
+        </a>
+      )}
+      {venueUrl && (
+        <a className="chip" style={{ height: 24, fontSize: 11, textDecoration: 'none' }} href={venueUrl} target="_blank" rel="noreferrer">
+          <Icon name="map-pin" size={10} color="var(--ink-soft)" /> Venue
+        </a>
+      )}
+    </div>
+  );
+}
+
+const EMPTY_PART: EventPart = { title: '', time: '', venue: '', venueUrl: '', ticketUrl: '' };
+
+function EventSheet({ open, event, onClose, onSave }: {
+  open: boolean; event: GroupEvent | null; onClose: () => void;
+  onSave: (input: EventInput) => void;
 }) {
   const [title, setTitle] = useState('');
   const [date, setDate] = useState('');
@@ -178,9 +227,26 @@ function NewEventSheet({ open, onClose, onCreate }: {
   const [venueUrl, setVenueUrl] = useState('');
   const [ticketUrl, setTicketUrl] = useState('');
   const [note, setNote] = useState('');
+  const [parts, setParts] = useState<EventPart[]>([]);
+
+  // Hydrate when opening (create = blank, edit = the event's current values)
+  useEffect(() => {
+    if (!open) return;
+    setTitle(event?.title ?? '');
+    setDate(event?.date ?? '');
+    setTime(event?.time ?? '');
+    setVenue(event?.venue ?? '');
+    setVenueUrl(event?.venueUrl ?? '');
+    setTicketUrl(event?.ticketUrl ?? '');
+    setNote(event?.note ?? '');
+    setParts(event?.parts.map((p) => ({ ...p })) ?? []);
+  }, [open, event]);
+
+  const setPart = (i: number, patch: Partial<EventPart>) =>
+    setParts((prev) => prev.map((p, x) => (x === i ? { ...p, ...patch } : p)));
 
   const submit = () => {
-    onCreate({
+    onSave({
       title: title.trim(),
       date: date || undefined,
       time: time.trim() || undefined,
@@ -188,14 +254,25 @@ function NewEventSheet({ open, onClose, onCreate }: {
       venueUrl: venueUrl.trim() || undefined,
       ticketUrl: ticketUrl.trim() || undefined,
       note: note.trim() || undefined,
+      parts: parts
+        .filter((p) => p.title.trim())
+        .map((p) => ({
+          ...p,
+          title: p.title.trim(),
+          time: p.time?.trim() || undefined,
+          venue: p.venue?.trim() || undefined,
+          venueUrl: p.venueUrl?.trim() || undefined,
+          ticketUrl: p.ticketUrl?.trim() || undefined,
+        })),
     });
-    setTitle(''); setDate(''); setTime(''); setVenue(''); setVenueUrl(''); setTicketUrl(''); setNote('');
   };
 
   return (
     <Sheet open={open} onClose={onClose}>
-      <h2 className="sec-title" style={{ marginBottom: 4 }}>Propose an event</h2>
-      <p className="hdr-sub" style={{ marginBottom: 18 }}>One date, quick RSVPs — dinner &amp; a show, a hike &amp; brunch…</p>
+      <h2 className="sec-title" style={{ marginBottom: 4 }}>{event ? 'Edit event' : 'Propose an event'}</h2>
+      <p className="hdr-sub" style={{ marginBottom: 18 }}>
+        {event ? 'Changes are visible to the whole group, and tracked.' : 'One date, quick RSVPs — add parts for multi-stop plans.'}
+      </p>
 
       <label style={{ fontSize: 13, color: 'var(--ink-soft)', display: 'block', marginBottom: 6 }}>What are we doing?</label>
       <input className="input" placeholder="e.g. Dinner & a show" value={title} autoFocus onChange={(e) => setTitle(e.target.value)} />
@@ -211,20 +288,54 @@ function NewEventSheet({ open, onClose, onCreate }: {
         </div>
       </div>
 
-      <label style={{ fontSize: 13, color: 'var(--ink-soft)', display: 'block', margin: '14px 0 6px' }}>Venue / restaurant</label>
-      <input className="input" placeholder="e.g. Bar Totti's" value={venue} onChange={(e) => setVenue(e.target.value)} />
+      <label style={{ fontSize: 13, color: 'var(--ink-soft)', display: 'block', margin: '14px 0 6px' }}>Venue</label>
+      <input className="input" placeholder="e.g. State Theatre" value={venue} onChange={(e) => setVenue(e.target.value)} />
 
-      <label style={{ fontSize: 13, color: 'var(--ink-soft)', display: 'block', margin: '14px 0 6px' }}>Venue link <span style={{ color: 'var(--ink-faint)' }}>(optional)</span></label>
-      <input className="input" type="url" placeholder="https://…" value={venueUrl} onChange={(e) => setVenueUrl(e.target.value)} />
+      <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
+        <div style={{ flex: 1 }}>
+          <label style={{ fontSize: 13, color: 'var(--ink-soft)', display: 'block', marginBottom: 6 }}>Ticket link</label>
+          <input className="input" type="url" placeholder="https://…" value={ticketUrl} onChange={(e) => setTicketUrl(e.target.value)} />
+        </div>
+        <div style={{ flex: 1 }}>
+          <label style={{ fontSize: 13, color: 'var(--ink-soft)', display: 'block', marginBottom: 6 }}>Venue link</label>
+          <input className="input" type="url" placeholder="https://…" value={venueUrl} onChange={(e) => setVenueUrl(e.target.value)} />
+        </div>
+      </div>
 
-      <label style={{ fontSize: 13, color: 'var(--ink-soft)', display: 'block', margin: '14px 0 6px' }}>Ticket link <span style={{ color: 'var(--ink-faint)' }}>(optional)</span></label>
-      <input className="input" type="url" placeholder="https://…" value={ticketUrl} onChange={(e) => setTicketUrl(e.target.value)} />
+      {/* Extra parts */}
+      {parts.map((p, i) => (
+        <div key={i} className="card" style={{ padding: '12px var(--cardpad)', marginTop: 14, background: 'var(--surface-2)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <p className="eyebrow">Part {i + 2}</p>
+            <button onClick={() => setParts((prev) => prev.filter((_, x) => x !== i))} aria-label={`Remove part ${i + 2}`} style={{ opacity: 0.5, padding: 2 }}>
+              <Icon name="x" size={13} color="var(--ink-soft)" />
+            </button>
+          </div>
+          <input className="input" placeholder="e.g. Late dinner" value={p.title} onChange={(e) => setPart(i, { title: e.target.value })} />
+          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+            <input className="input" placeholder="Time" value={p.time ?? ''} style={{ flex: 0.7 }} onChange={(e) => setPart(i, { time: e.target.value })} />
+            <input className="input" placeholder="Venue" value={p.venue ?? ''} style={{ flex: 1.3 }} onChange={(e) => setPart(i, { venue: e.target.value })} />
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+            <input className="input" type="url" placeholder="Ticket link" value={p.ticketUrl ?? ''} onChange={(e) => setPart(i, { ticketUrl: e.target.value })} />
+            <input className="input" type="url" placeholder="Venue link" value={p.venueUrl ?? ''} onChange={(e) => setPart(i, { venueUrl: e.target.value })} />
+          </div>
+        </div>
+      ))}
+
+      <button
+        className="btn ghost sm"
+        style={{ width: '100%', marginTop: 14, gap: 6 }}
+        onClick={() => setParts((prev) => [...prev, { ...EMPTY_PART }])}
+      >
+        <Icon name="plus" size={13} color="var(--ink)" /> Add another part (dinner, drinks, the show…)
+      </button>
 
       <label style={{ fontSize: 13, color: 'var(--ink-soft)', display: 'block', margin: '14px 0 6px' }}>Anything else?</label>
       <input className="input" placeholder="e.g. early dinner, then the 8pm session" value={note} onChange={(e) => setNote(e.target.value)} />
 
       <button className="btn" disabled={!title.trim()} style={{ width: '100%', marginTop: 24 }} onClick={submit}>
-        Propose to the group
+        {event ? 'Save changes' : 'Propose to the group'}
       </button>
     </Sheet>
   );

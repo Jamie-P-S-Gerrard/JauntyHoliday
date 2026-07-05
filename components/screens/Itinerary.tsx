@@ -41,6 +41,7 @@ export function Itinerary({ tripId, groupId, userId, api, datesApi, members, des
   const [loading, setLoading] = useState(true);
   const [selectedDay, setSelectedDay] = useState(1);
   const [addOpen, setAddOpen] = useState(false);
+  const [editItem, setEditItem] = useState<{ id: string; time?: string; title: string; place?: string; cat: ItineraryItemCat } | null>(null);
   const [busy, setBusy] = useState(false);
   const [prefill, setPrefill] = useState<{ start?: string; end?: string }>({});
 
@@ -176,15 +177,30 @@ export function Itinerary({ tripId, groupId, userId, api, datesApi, members, des
                 <div className="card" style={{ padding: '12px var(--cardpad)' }}>
                   <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
                     <p style={{ fontSize: 14.5, fontWeight: 600 }}>{item.title}</p>
-                    {item.who === userId && (
+                    <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
                       <button
-                        onClick={() => run(() => api.removeItem(item.id))}
-                        aria-label="Remove plan"
-                        style={{ opacity: 0.45, padding: 2, flexShrink: 0 }}
+                        onClick={() => setEditItem({
+                          id: item.id,
+                          time: item.t !== '–' ? item.t : undefined,
+                          title: item.title,
+                          place: item.place || undefined,
+                          cat: item.cat,
+                        })}
+                        aria-label="Edit plan"
+                        style={{ opacity: 0.5, padding: 2 }}
                       >
-                        <Icon name="x" size={13} color="var(--ink-soft)" />
+                        <Icon name="edit" size={13} color="var(--ink-soft)" />
                       </button>
-                    )}
+                      {item.who === userId && (
+                        <button
+                          onClick={() => run(() => api.removeItem(item.id))}
+                          aria-label="Remove plan"
+                          style={{ opacity: 0.45, padding: 2 }}
+                        >
+                          <Icon name="x" size={13} color="var(--ink-soft)" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
                     {item.place && (
@@ -233,16 +249,19 @@ export function Itinerary({ tripId, groupId, userId, api, datesApi, members, des
       </div>
 
       <AddItemSheet
-        open={addOpen}
+        open={addOpen || !!editItem}
         dayN={day.n}
         dayDate={day.date}
         tripId={tripId}
         dest={dest}
         prefs={prefs}
-        onClose={() => setAddOpen(false)}
+        initial={editItem}
+        onClose={() => { setAddOpen(false); setEditItem(null); }}
         onAdd={(input) => {
+          const editingId = editItem?.id;
           setAddOpen(false);
-          run(() => api.addItem(day.id, input));
+          setEditItem(null);
+          run(() => (editingId ? api.updateItem(editingId, input) : api.addItem(day.id, input)));
         }}
       />
     </>
@@ -295,9 +314,11 @@ function SetupDays({ initialStart, initialEnd, onSetup }: {
   );
 }
 
-function AddItemSheet({ open, dayN, dayDate, tripId, dest, prefs, onClose, onAdd }: {
+function AddItemSheet({ open, dayN, dayDate, tripId, dest, prefs, initial, onClose, onAdd }: {
   open: boolean; dayN: number; dayDate?: string; tripId: string;
-  dest?: string; prefs?: GroupPrefs; onClose: () => void;
+  dest?: string; prefs?: GroupPrefs;
+  initial?: { id: string; time?: string; title: string; place?: string; cat: ItineraryItemCat } | null;
+  onClose: () => void;
   onAdd: (input: { time?: string; title: string; place?: string; cat: ItineraryItemCat }) => void;
 }) {
   const [title, setTitle] = useState('');
@@ -306,6 +327,16 @@ function AddItemSheet({ open, dayN, dayDate, tripId, dest, prefs, onClose, onAdd
   const [cat, setCat] = useState<ItineraryItemCat>('activity');
   const [ideas, setIdeas] = useState<AiSuggestion[] | null>(null);
   const [loadingIdeas, setLoadingIdeas] = useState(false);
+
+  // Hydrate for edit mode (or clear for create) whenever the sheet opens
+  useEffect(() => {
+    if (!open) return;
+    setTitle(initial?.title ?? '');
+    setPlace(initial?.place ?? '');
+    setTime(initial?.time ?? '');
+    setCat(initial?.cat ?? 'activity');
+    setIdeas(null);
+  }, [open, initial]);
 
   const askAi = async () => {
     const where = dest || 'our destination';
@@ -337,7 +368,7 @@ function AddItemSheet({ open, dayN, dayDate, tripId, dest, prefs, onClose, onAdd
 
   return (
     <Sheet open={open} onClose={onClose}>
-      <h2 className="sec-title" style={{ marginBottom: 20 }}>Add to Day {dayN}</h2>
+      <h2 className="sec-title" style={{ marginBottom: 20 }}>{initial ? 'Edit plan' : `Add to Day ${dayN}`}</h2>
       <label style={{ fontSize: 13, color: 'var(--ink-soft)', display: 'block', marginBottom: 6 }}>What&apos;s the plan?</label>
       <input className="input" placeholder="e.g. Sunset surf lesson" value={title} autoFocus onChange={(e) => setTitle(e.target.value)} />
 
@@ -411,7 +442,7 @@ function AddItemSheet({ open, dayN, dayDate, tripId, dest, prefs, onClose, onAdd
           setTitle(''); setPlace(''); setTime(''); setCat('activity');
         }}
       >
-        Add to the plan
+        {initial ? 'Save changes' : 'Add to the plan'}
       </button>
     </Sheet>
   );

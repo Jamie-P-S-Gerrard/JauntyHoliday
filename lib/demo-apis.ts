@@ -2,7 +2,7 @@
 // (no Supabase configured). State survives navigation but not a refresh.
 import { dateRange, formatDayLabel, formatRange, formatSub } from './dates';
 import { DAYS } from './data';
-import type { BoardApi, BoardItem, ChatApi, ChatMsg, ChatScope, DateOption, DatesApi, Day, EventsApi, GroupEvent, ItineraryApi, Stay, StaysApi } from '@/types';
+import type { BoardApi, BoardItem, ChangeEntry, ChatApi, ChatMsg, ChatScope, DateOption, DatesApi, Day, EventsApi, GroupEvent, HistoryApi, ItineraryApi, Stay, StaysApi } from '@/types';
 
 const DEMO_USER = 'j';
 
@@ -136,6 +136,21 @@ export const demoItineraryApi: ItineraryApi = {
       }
     }
   },
+  async updateItem(itemId, { time, title, place, cat }) {
+    await wait();
+    for (const days of Object.values(dayStore)) {
+      for (const day of days) {
+        const item = day.items.find((i) => i.id === itemId);
+        if (item) {
+          item.t = time || '–';
+          item.title = title;
+          item.place = place ?? '';
+          item.cat = cat;
+        }
+      }
+    }
+  },
+
   async removeItem(itemId) {
     await wait();
     for (const days of Object.values(dayStore)) {
@@ -177,6 +192,18 @@ export const demoStaysApi: StaysApi = {
     const list = stayStore[tripId] ?? (stayStore[tripId] = []);
     list.push({ id: `s${Date.now()}`, ...input, who: DEMO_USER });
   },
+  async update(stayId, input) {
+    await wait();
+    for (const list of Object.values(stayStore)) {
+      const s = list.find((x) => x.id === stayId);
+      if (s) {
+        s.title = input.title;
+        s.area = input.area;
+        s.cost = input.cost;
+      }
+    }
+  },
+
   async setStatus(stayId, status) {
     await wait();
     for (const list of Object.values(stayStore)) {
@@ -201,6 +228,9 @@ const eventStore: Record<string, GroupEvent[]> = {
       note: 'Early dinner then the 8pm session.', venue: 'Bar Totti\'s',
       venueUrl: 'https://example.com/tottis', ticketUrl: 'https://example.com/tickets',
       tint: '#b07a9a', who: 'c', going: ['c', 'j'],
+      parts: [
+        { id: 'evp1', title: 'The 8pm show', time: '8pm', venue: 'State Theatre', ticketUrl: 'https://example.com/tickets' },
+      ],
     },
   ],
 };
@@ -214,8 +244,18 @@ export const demoEventsApi: EventsApi = {
     await wait();
     const list = eventStore[groupId] ?? (eventStore[groupId] = []);
     list.push({
-      id: `ev${Date.now()}`, tint: '#b07a9a', who: DEMO_USER, going: [DEMO_USER], ...input,
+      id: `ev${Date.now()}`, tint: '#b07a9a', who: DEMO_USER, going: [DEMO_USER],
+      ...input, parts: input.parts ?? [],
     });
+  },
+  async update(eventId, input) {
+    await wait();
+    for (const list of Object.values(eventStore)) {
+      const i = list.findIndex((x) => x.id === eventId);
+      if (i >= 0) {
+        list[i] = { ...list[i], ...input, parts: input.parts ?? [] };
+      }
+    }
   },
   async rsvp(eventId, going) {
     await wait();
@@ -260,5 +300,20 @@ export const demoChatApi: ChatApi = {
     const key = chatKey(scope);
     const list = chatStore[key] ?? (chatStore[key] = []);
     list.push({ id: `m${Date.now()}`, who: DEMO_USER, body, at: new Date().toISOString() });
+  },
+};
+
+// ── History (demo) ────────────────────────────────────────────────────────────
+
+const demoHistory: ChangeEntry[] = [
+  { id: 'h1', table: 'events', action: 'update', who: 'c', summary: 'Dinner & a show', changedFields: ['venue', 'time_label'], at: new Date(Date.now() - 7200e3).toISOString() },
+  { id: 'h2', table: 'itinerary_items', action: 'insert', who: 'j', summary: 'Pink Beach snorkel trip', changedFields: [], at: new Date(Date.now() - 86400e3).toISOString() },
+  { id: 'h3', table: 'bookings', action: 'update', who: 'c', summary: 'Ashtari Hillside Villa', changedFields: ['status'], at: new Date(Date.now() - 172800e3).toISOString() },
+];
+
+export const demoHistoryApi: HistoryApi = {
+  async list() {
+    await wait();
+    return [...demoHistory];
   },
 };

@@ -6,8 +6,9 @@ import { Icon } from '@/components/ui/Icon';
 import { Sheet } from '@/components/ui/Sheet';
 import { Placeholder } from '@/components/ui/Placeholder';
 import { GroupEvents } from './GroupEvents';
+import { HistorySheet } from '@/components/ui/HistorySheet';
 import { INTEREST_OPTIONS } from '@/lib/data';
-import type { ChatApi, EventsApi, Group, GroupPrefs, TripSummary, TripStatus } from '@/types';
+import type { ChatApi, EventsApi, Group, GroupPrefs, HistoryApi, TripSummary, TripStatus } from '@/types';
 
 const VIBES: Array<{ id: NonNullable<GroupPrefs['vibe']>; label: string }> = [
   { id: 'cozy',      label: 'Cozy getaway' },
@@ -34,14 +35,16 @@ interface GroupScreenProps {
   userId: string;
   eventsApi: EventsApi;
   chatApi: ChatApi;
+  historyApi: HistoryApi;
   onBack: () => void;
   onOpenTrip: (t: TripSummary) => void;
   onCreateTrip: (t: TripSummary) => void;
   onUpdatePrefs: (p: GroupPrefs) => void;
 }
 
-export function GroupScreen({ group, userId, eventsApi, chatApi, onBack, onOpenTrip, onCreateTrip, onUpdatePrefs }: GroupScreenProps) {
+export function GroupScreen({ group, userId, eventsApi, chatApi, historyApi, onBack, onOpenTrip, onCreateTrip, onUpdatePrefs }: GroupScreenProps) {
   const [newTripOpen, setNewTripOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [prefsOpen, setPrefsOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -84,6 +87,10 @@ export function GroupScreen({ group, userId, eventsApi, chatApi, onBack, onOpenT
               </span>
             </div>
           </div>
+          <button className="chip" style={{ background: 'rgba(255,255,255,0.9)', marginRight: 6 }} onClick={() => setHistoryOpen(true)}>
+            <Icon name="history" size={12} color="var(--ink)" />
+            Activity
+          </button>
           <button className="chip" style={{ background: 'rgba(255,255,255,0.9)' }} onClick={copyCode}>
             <Icon name="copy" size={12} color="var(--ink)" />
             {copied ? 'Copied!' : group.inviteCode}
@@ -154,6 +161,13 @@ export function GroupScreen({ group, userId, eventsApi, chatApi, onBack, onOpenT
           )}
         </div>
       </div>
+
+      <HistorySheet
+        open={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        groupId={group.id}
+        api={historyApi}
+      />
 
       <NewTripSheet
         open={newTripOpen}

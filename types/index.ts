@@ -96,6 +96,15 @@ export interface AiSuggestion {
 
 // ── Events: lightweight single-date outings proposed to the group ────────────
 
+export interface EventPart {
+  id?: string;        // absent for parts not yet saved
+  title: string;
+  time?: string;
+  venue?: string;
+  venueUrl?: string;
+  ticketUrl?: string;
+}
+
 export interface GroupEvent {
   id: string;
   title: string;
@@ -108,6 +117,7 @@ export interface GroupEvent {
   tint: string;
   who: UserId;
   going: UserId[];
+  parts: EventPart[];
 }
 
 export interface EventInput {
@@ -118,11 +128,13 @@ export interface EventInput {
   venue?: string;
   venueUrl?: string;
   ticketUrl?: string;
+  parts?: EventPart[];
 }
 
 export interface EventsApi {
   list(groupId: string): Promise<GroupEvent[]>;
   add(groupId: string, input: EventInput): Promise<void>;
+  update(eventId: string, input: EventInput): Promise<void>;
   rsvp(eventId: string, going: boolean): Promise<void>;
   remove(eventId: string): Promise<void>;
 }
@@ -223,6 +235,7 @@ export interface ItineraryApi {
   listDays(tripId: string): Promise<Day[]>;
   setupDays(tripId: string, groupId: string, start: string, end: string): Promise<void>;
   addItem(dayId: string, input: { time?: string; title: string; place?: string; cat: ItineraryItemCat }): Promise<void>;
+  updateItem(itemId: string, input: { time?: string; title: string; place?: string; cat: ItineraryItemCat }): Promise<void>;
   removeItem(itemId: string): Promise<void>;
   toggleLike(itemId: string, liked: boolean): Promise<void>;
 }
@@ -241,6 +254,7 @@ export interface Stay {
 export interface StaysApi {
   list(tripId: string): Promise<Stay[]>;
   add(tripId: string, groupId: string, input: { title: string; area?: string; cost?: number; status: StayStatus }): Promise<void>;
+  update(stayId: string, input: { title: string; area?: string; cost?: number }): Promise<void>;
   setStatus(stayId: string, status: StayStatus): Promise<void>;
   remove(stayId: string): Promise<void>;
 }
@@ -323,4 +337,20 @@ export interface ChatMessage {
   cardIds?: string[];
   suggestions?: AiSuggestion[];
   culture?: boolean;
+}
+
+// ── Change history (read-only; rows written by a DB trigger) ─────────────────
+
+export interface ChangeEntry {
+  id: string;
+  table: string;
+  action: 'insert' | 'update' | 'delete';
+  who: UserId | null;
+  summary?: string;
+  changedFields: string[];
+  at: string;
+}
+
+export interface HistoryApi {
+  list(groupId: string): Promise<ChangeEntry[]>;
 }
