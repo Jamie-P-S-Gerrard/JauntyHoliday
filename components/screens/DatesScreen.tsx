@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/components/ui/Toast';
 import { useCallback, useEffect, useState } from 'react';
 import { AvatarStack } from '@/components/ui/Avatar';
 import { Icon } from '@/components/ui/Icon';
@@ -39,7 +40,7 @@ export function DatesScreen({ tripId, userId, members, api }: DatesScreenProps) 
       await fn();
       await reload();
     } catch (e) {
-      window.alert(e instanceof Error ? e.message : 'Something went wrong');
+      toast(e instanceof Error ? e.message : 'Something went wrong');
     } finally {
       setBusy(false);
     }

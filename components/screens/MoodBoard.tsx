@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/components/ui/Toast';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Avatar } from '@/components/ui/Avatar';
 import { Icon } from '@/components/ui/Icon';
@@ -40,7 +41,7 @@ export function MoodBoard({ tripId, groupId, userId, api }: MoodBoardProps) {
       await fn();
       await reload();
     } catch (e) {
-      window.alert(e instanceof Error ? e.message : 'Something went wrong');
+      toast(e instanceof Error ? e.message : 'Something went wrong');
     } finally {
       setBusy(false);
     }

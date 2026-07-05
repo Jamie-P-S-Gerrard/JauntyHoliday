@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/components/ui/Toast';
 import { useCallback, useEffect, useState } from 'react';
 import { Avatar } from '@/components/ui/Avatar';
 import { Icon } from '@/components/ui/Icon';
@@ -57,7 +58,7 @@ export function Itinerary({ tripId, groupId, userId, api }: ItineraryProps) {
       await fn();
       await reload();
     } catch (e) {
-      window.alert(e instanceof Error ? e.message : 'Something went wrong');
+      toast(e instanceof Error ? e.message : 'Something went wrong');
     } finally {
       setBusy(false);
     }

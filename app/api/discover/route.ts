@@ -1,9 +1,15 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { NextRequest } from 'next/server';
 import { demoDiscoverReply } from '@/lib/discover-demo';
+import { createClient } from '@/lib/supabase/server';
+import { supabaseConfigured } from '@/lib/supabase/configured';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+
+const MODEL = 'claude-opus-4-8';
+// Per-user requests per UTC day; generous for family use, fatal for abuse
+const DAILY_LIMIT = Number(process.env.AI_DAILY_LIMIT ?? 50);
 
 interface GroupPrefsPayload {
   vibe?: string;
@@ -63,11 +69,12 @@ RULES:
 }
 
 export async function POST(req: NextRequest) {
-  const { query, history = [], dest, prefs } = await req.json() as {
+  const { query, history = [], dest, prefs, tripId } = await req.json() as {
     query: string;
     history: Array<{ role: 'user' | 'assistant'; text: string }>;
     dest?: string;
     prefs?: GroupPrefsPayload;
+    tripId?: string;
   };
 
   if (!query?.trim()) {
@@ -81,6 +88,33 @@ export async function POST(req: NextRequest) {
     return Response.json(demoDiscoverReply(query, dest));
   }
 
+  // A real Anthropic key is spending real money: require a signed-in user
+  // and enforce a per-user daily cap.
+  let userId: string | null = null;
+  let supabase: Awaited<ReturnType<typeof createClient>> | null = null;
+  if (supabaseConfigured()) {
+    supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return Response.json({ error: 'Sign in to ask the trip assistant.' }, { status: 401 });
+    }
+    userId = user.id;
+
+    const startOfDay = new Date();
+    startOfDay.setUTCHours(0, 0, 0, 0);
+    const { count, error: countError } = await supabase
+      .from('ai_usage')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .gte('created_at', startOfDay.toISOString());
+    if (!countError && (count ?? 0) >= DAILY_LIMIT) {
+      return Response.json(
+        { error: "You've hit today's AI limit — it resets tomorrow!" },
+        { status: 429 },
+      );
+    }
+  }
+
   const client = new Anthropic();
 
   // Build message list: history (prior turns) + current user query
@@ -90,7 +124,7 @@ export async function POST(req: NextRequest) {
   ];
 
   const stream = client.messages.stream({
-    model: 'claude-opus-4-8',
+    model: MODEL,
     max_tokens: 2048,
     thinking: { type: 'adaptive' },
     system: buildSystem(dest, prefs),
@@ -98,6 +132,18 @@ export async function POST(req: NextRequest) {
   });
 
   const msg = await stream.finalMessage();
+
+  // Record spend (feeds the daily cap + the admin cost dashboard)
+  if (supabase && userId) {
+    const { error: usageError } = await supabase.from('ai_usage').insert({
+      user_id: userId,
+      trip_id: tripId ?? null,
+      model: MODEL,
+      input_tokens: msg.usage.input_tokens,
+      output_tokens: msg.usage.output_tokens,
+    });
+    if (usageError) console.error('ai_usage insert failed:', usageError.message);
+  }
 
   // Find the text block (skip thinking blocks)
   const textBlock = msg.content.find((b) => b.type === 'text');

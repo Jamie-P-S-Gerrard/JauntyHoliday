@@ -1,4 +1,5 @@
 'use client';
+import { toast, Toaster } from '@/components/ui/Toast';
 import { useCallback, useEffect, useState } from 'react';
 import { TabBar } from './ui/TabBar';
 import { Sidebar } from './ui/Sidebar';
@@ -55,7 +56,7 @@ export function AppShell() {
       return fetched;
     } catch (e) {
       console.error(e);
-      window.alert(e instanceof Error ? e.message : 'Could not load your groups');
+      toast(e instanceof Error ? e.message : 'Could not load your groups');
       return [];
     } finally {
       setLoadingData(false);
@@ -129,7 +130,7 @@ export function AppShell() {
         if (fresh[0]) setActiveGroupId(fresh[0].id); // newest first
         setStage('group');
       } catch (e) {
-        window.alert(e instanceof Error ? e.message : 'Could not create the group');
+        toast(e instanceof Error ? e.message : 'Could not create the group');
       }
       return;
     }
@@ -169,7 +170,7 @@ export function AppShell() {
           setStage('setup');
         }
       } catch (e) {
-        window.alert(e instanceof Error ? e.message : 'Could not create the trip');
+        toast(e instanceof Error ? e.message : 'Could not create the trip');
       }
       return;
     }
@@ -185,7 +186,7 @@ export function AppShell() {
       try {
         await savePrefsDb(activeGroup.id, p);
       } catch (e) {
-        window.alert(e instanceof Error ? e.message : 'Could not save preferences');
+        toast(e instanceof Error ? e.message : 'Could not save preferences');
         loadData();
       }
     }
@@ -349,6 +350,8 @@ export function AppShell() {
             </>
           )}
         </div>
+
+        <Toaster />
       </div>
     </div>
   );

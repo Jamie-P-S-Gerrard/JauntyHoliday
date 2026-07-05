@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/components/ui/Toast';
 import { useState, useRef, useEffect } from 'react';
 import { Avatar } from '@/components/ui/Avatar';
 import { Icon } from '@/components/ui/Icon';
@@ -22,14 +23,18 @@ async function callDiscover(
   history: Array<{ role: 'user' | 'assistant'; text: string }>,
   dest?: string,
   prefs?: GroupPrefs,
+  tripId?: string,
 ): Promise<{ text: string; cardIds?: string[]; culture?: boolean }> {
   const res = await fetch('/api/discover', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query, history, dest, prefs }),
+    body: JSON.stringify({ query, history, dest, prefs, tripId }),
   });
-  if (!res.ok) throw new Error('discover api error');
-  return res.json();
+  const body = await res.json().catch(() => null);
+  if (!res.ok) {
+    throw new Error(body?.error ?? 'discover api error');
+  }
+  return body;
 }
 
 function introFor(dest?: string): ChatMessage {
@@ -76,13 +81,15 @@ export function DiscoverScreen({ saved, onSave, onAdd, dest, prefs, tripId, grou
       const history = messages
         .filter((m) => m.id !== 'intro')
         .map((m) => ({ role: m.role as 'user' | 'assistant', text: m.text }));
-      const reply = await callDiscover(text.trim(), history, dest, prefs);
+      const reply = await callDiscover(text.trim(), history, dest, prefs, tripId);
       const aiMsg: any = { id: `a${Date.now()}`, role: 'assistant', ...reply };
       setMessages((prev) => [...prev, aiMsg]);
-    } catch {
+    } catch (e) {
       const aiMsg: any = {
         id: `a${Date.now()}`, role: 'assistant',
-        text: "Sorry, I couldn't connect right now. Try again in a moment!",
+        text: e instanceof Error && e.message !== 'discover api error'
+          ? e.message
+          : "Sorry, I couldn't connect right now. Try again in a moment!",
       };
       setMessages((prev) => [...prev, aiMsg]);
     } finally {
@@ -175,7 +182,7 @@ export function DiscoverScreen({ saved, onSave, onAdd, dest, prefs, tripId, grou
                             )
                           );
                         } catch (e) {
-                          window.alert(e instanceof Error ? e.message : 'Could not pin');
+                          toast(e instanceof Error ? e.message : 'Could not pin');
                         }
                       }}
                     />
