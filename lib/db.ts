@@ -6,6 +6,7 @@ import type {
   Group, GroupPrefs, TripSummary, TripStatus,
   DateOption, DatesApi, BoardItem, BoardApi,
   Day, ItineraryApi, Stay, StaysApi, StayStatus,
+  GroupEvent, EventsApi, ChatApi, ChatMsg,
 } from '@/types';
 
 const TRIP_TINTS = ['#caa37a', '#7fa0c0', '#9aa56a', '#b07a9a', '#c77f6a', '#7fa39a'];
@@ -428,6 +429,109 @@ export const dbStaysApi: StaysApi = {
   async remove(stayId) {
     const supabase = createClient();
     const { error } = await supabase.from('bookings').delete().eq('id', stayId);
+    if (error) throw error;
+  },
+};
+
+// ── Events ────────────────────────────────────────────────────────────────────
+
+export const dbEventsApi: EventsApi = {
+  async list(groupId) {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from('events')
+      .select('id, title, event_date, time_label, note, venue, venue_url, ticket_url, tint, created_by, event_rsvps ( user_id )')
+      .eq('group_id', groupId)
+      .order('event_date', { ascending: true, nullsFirst: false });
+    if (error) throw error;
+    return (data ?? []).map((e): GroupEvent => ({
+      id: e.id,
+      title: e.title,
+      date: e.event_date ?? undefined,
+      time: e.time_label ?? undefined,
+      note: e.note ?? undefined,
+      venue: e.venue ?? undefined,
+      venueUrl: e.venue_url ?? undefined,
+      ticketUrl: e.ticket_url ?? undefined,
+      tint: e.tint ?? '#b07a9a',
+      who: e.created_by ?? '',
+      going: (e.event_rsvps ?? []).map((r: { user_id: string }) => r.user_id),
+    }));
+  },
+
+  async add(groupId, input) {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not signed in');
+    const { data: event, error } = await supabase.from('events').insert({
+      group_id: groupId,
+      title: input.title,
+      event_date: input.date || null,
+      time_label: input.time || null,
+      note: input.note || null,
+      venue: input.venue || null,
+      venue_url: input.venueUrl || null,
+      ticket_url: input.ticketUrl || null,
+      created_by: user.id,
+    }).select('id').single();
+    if (error) throw error;
+    // Proposer is automatically in
+    await supabase.from('event_rsvps').insert({ event_id: event.id, user_id: user.id });
+  },
+
+  async rsvp(eventId, going) {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not signed in');
+    if (going) {
+      const { error } = await supabase.from('event_rsvps').insert({ event_id: eventId, user_id: user.id });
+      if (error && error.code !== '23505') throw error;
+    } else {
+      const { error } = await supabase.from('event_rsvps').delete()
+        .eq('event_id', eventId).eq('user_id', user.id);
+      if (error) throw error;
+    }
+  },
+
+  async remove(eventId) {
+    const supabase = createClient();
+    const { error } = await supabase.from('events').delete().eq('id', eventId);
+    if (error) throw error;
+  },
+};
+
+// ── Chat ──────────────────────────────────────────────────────────────────────
+
+export const dbChatApi: ChatApi = {
+  async list(scope) {
+    const supabase = createClient();
+    let q = supabase
+      .from('messages')
+      .select('id, who, body, created_at')
+      .eq('group_id', scope.groupId)
+      .order('created_at', { ascending: true })
+      .limit(200);
+    if (scope.eventId) q = q.eq('event_id', scope.eventId);
+    else if (scope.tripId) q = q.eq('trip_id', scope.tripId);
+    else q = q.is('trip_id', null).is('event_id', null);
+    const { data, error } = await q;
+    if (error) throw error;
+    return (data ?? []).map((m): ChatMsg => ({
+      id: m.id, who: m.who, body: m.body, at: m.created_at,
+    }));
+  },
+
+  async send(scope, body) {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not signed in');
+    const { error } = await supabase.from('messages').insert({
+      group_id: scope.groupId,
+      trip_id: scope.tripId ?? null,
+      event_id: scope.eventId ?? null,
+      who: user.id,
+      body,
+    });
     if (error) throw error;
   },
 };

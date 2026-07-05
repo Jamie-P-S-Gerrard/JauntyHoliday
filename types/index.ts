@@ -91,7 +91,60 @@ export interface AiSuggestion {
   area: string;
   detail: string;
   price?: string;
-  kind: 'stay' | 'eat' | 'activity';
+  kind: 'stay' | 'eat' | 'activity' | 'travel';
+}
+
+// ── Events: lightweight single-date outings proposed to the group ────────────
+
+export interface GroupEvent {
+  id: string;
+  title: string;
+  date?: string;      // ISO yyyy-mm-dd
+  time?: string;      // free text, e.g. "7pm"
+  note?: string;
+  venue?: string;
+  venueUrl?: string;
+  ticketUrl?: string;
+  tint: string;
+  who: UserId;
+  going: UserId[];
+}
+
+export interface EventInput {
+  title: string;
+  date?: string;
+  time?: string;
+  note?: string;
+  venue?: string;
+  venueUrl?: string;
+  ticketUrl?: string;
+}
+
+export interface EventsApi {
+  list(groupId: string): Promise<GroupEvent[]>;
+  add(groupId: string, input: EventInput): Promise<void>;
+  rsvp(eventId: string, going: boolean): Promise<void>;
+  remove(eventId: string): Promise<void>;
+}
+
+// ── Chat: message threads on a trip or an event ───────────────────────────────
+
+export interface ChatMsg {
+  id: string;
+  who: UserId;
+  body: string;
+  at: string;
+}
+
+export interface ChatScope {
+  groupId: string;
+  tripId?: string;
+  eventId?: string;
+}
+
+export interface ChatApi {
+  list(scope: ChatScope): Promise<ChatMsg[]>;
+  send(scope: ChatScope, body: string): Promise<void>;
 }
 
 // Injected per environment: real Supabase implementation when configured,

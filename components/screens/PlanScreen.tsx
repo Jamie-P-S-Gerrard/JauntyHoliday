@@ -7,7 +7,7 @@ import { Sheet } from '@/components/ui/Sheet';
 import { MoodBoard } from './MoodBoard';
 import { Itinerary } from './Itinerary';
 import { SIDE_TRIPS, PACKING_LISTS, USER_NAMES } from '@/lib/data';
-import type { PlanTab, SideTrip, PackingList, BoardApi, ItineraryApi } from '@/types';
+import type { PlanTab, SideTrip, PackingList, BoardApi, ItineraryApi, DatesApi, GroupPrefs } from '@/types';
 
 interface PlanScreenProps {
   tripId: string;
@@ -15,6 +15,10 @@ interface PlanScreenProps {
   userId: string;
   boardApi: BoardApi;
   itinApi: ItineraryApi;
+  datesApi: DatesApi;
+  members: string[];
+  dest?: string;
+  prefs?: GroupPrefs;
 }
 
 const TAB_LABELS: Record<PlanTab, string> = {
@@ -24,7 +28,7 @@ const TAB_LABELS: Record<PlanTab, string> = {
   board: 'Board',
 };
 
-export function PlanScreen({ tripId, groupId, userId, boardApi, itinApi }: PlanScreenProps) {
+export function PlanScreen({ tripId, groupId, userId, boardApi, itinApi, datesApi, members, dest, prefs }: PlanScreenProps) {
   const [tab, setTab] = useState<PlanTab>('itinerary');
 
   return (
@@ -59,7 +63,7 @@ export function PlanScreen({ tripId, groupId, userId, boardApi, itinApi }: PlanS
       </div>
 
       {tab === 'itinerary' && (
-        <Itinerary tripId={tripId} groupId={groupId} userId={userId} api={itinApi} />
+        <Itinerary tripId={tripId} groupId={groupId} userId={userId} api={itinApi} datesApi={datesApi} members={members} dest={dest} prefs={prefs} />
       )}
       {tab === 'sidetrips' && <SideTripsBody />}
       {tab === 'packing' && <PackingBody />}

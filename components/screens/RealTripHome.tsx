@@ -5,7 +5,8 @@ import { AvatarStack } from '@/components/ui/Avatar';
 import { Icon } from '@/components/ui/Icon';
 import { Sheet } from '@/components/ui/Sheet';
 import { Placeholder } from '@/components/ui/Placeholder';
-import type { AppTab, Day, ItineraryApi, Stay, StaysApi, StayStatus } from '@/types';
+import { ChatSheet } from '@/components/ui/ChatSheet';
+import type { AppTab, ChatApi, Day, ItineraryApi, Stay, StaysApi, StayStatus } from '@/types';
 
 const STATUS_META: Record<StayStatus, { label: string; cls: string }> = {
   todo:    { label: 'Idea',    cls: 'gold' },
@@ -27,17 +28,19 @@ interface RealTripHomeProps {
   userId: string;
   staysApi: StaysApi;
   itinApi: ItineraryApi;
+  chatApi: ChatApi;
   onSwitch: () => void;
   go: (tab: AppTab) => void;
 }
 
 export function RealTripHome({
   groupName, dest, when, tint, members, tripId, groupId, userId,
-  staysApi, itinApi, onSwitch, go,
+  staysApi, itinApi, chatApi, onSwitch, go,
 }: RealTripHomeProps) {
   const [stays, setStays] = useState<Stay[]>([]);
   const [days, setDays] = useState<Day[]>([]);
   const [addStayOpen, setAddStayOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const reload = useCallback(async () => {
@@ -92,13 +95,14 @@ export function RealTripHome({
         </div>
 
         {/* Quick actions */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 20 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 20 }}>
           {([
             { icon: 'calendar', label: 'Vote on dates', tab: 'dates' as AppTab },
             { icon: 'sparkles', label: 'Ask the AI',    tab: 'discover' as AppTab },
             { icon: 'route',    label: 'Daily plan',    tab: 'plan' as AppTab },
+            { icon: 'message-square', label: 'Crew chat', tab: null as AppTab | null },
           ]).map((a) => (
-            <button key={a.tab} className="card" style={{ padding: '14px 10px', textAlign: 'center' }} onClick={() => go(a.tab)}>
+            <button key={a.label} className="card" style={{ padding: '14px 10px', textAlign: 'center' }} onClick={() => (a.tab ? go(a.tab) : setChatOpen(true))}>
               <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 6 }}>
                 <Icon name={a.icon} size={18} color="var(--terra)" />
               </div>
@@ -179,6 +183,15 @@ export function RealTripHome({
 
         <div style={{ height: 90 }} />
       </div>
+
+      <ChatSheet
+        open={chatOpen}
+        onClose={() => setChatOpen(false)}
+        title={dest + ' crew chat'}
+        scope={{ groupId, tripId }}
+        api={chatApi}
+        userId={userId}
+      />
 
       <AddStaySheet
         open={addStayOpen}

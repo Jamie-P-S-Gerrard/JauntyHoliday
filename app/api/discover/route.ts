@@ -56,7 +56,7 @@ RESPONSE FORMAT — reply ONLY with valid JSON, no markdown fences, no preamble:
   "text": "1–3 warm, specific sentences answering the query",
   ${isLombok ? '"cardIds": ["a1"],' : ''}
   "suggestions": [
-    { "title": "Name of place/experience", "area": "Neighbourhood or region", "detail": "One specific, useful sentence", "price": "$40pp", "kind": "stay|eat|activity" }
+    { "title": "Name of place/experience", "area": "Neighbourhood or region", "detail": "One specific, useful sentence", "price": "$40pp", "kind": "stay|eat|activity|travel" }
   ]${isLombok ? ',\n  "culture": false' : ''}
 }
 
@@ -65,6 +65,7 @@ RULES:
 - "price" is a short indicative string like "$40pp" or "$$" — omit if unknown
 - Be specific to ${place} — reference real neighbourhoods, seasons, and local details
 - If no destination is chosen yet, help them choose: suggest destinations as "suggestions" with kind "activity"
+- For flights/transport queries use kind "travel" with realistic routes/airlines and rough indicative prices, and say prices are indicative
 - Keep tone friendly and helpful, not generic`;
 }
 

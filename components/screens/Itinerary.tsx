@@ -5,7 +5,7 @@ import { Avatar } from '@/components/ui/Avatar';
 import { Icon } from '@/components/ui/Icon';
 import { Sheet } from '@/components/ui/Sheet';
 import { Placeholder } from '@/components/ui/Placeholder';
-import type { Day, ItineraryApi, ItineraryItemCat } from '@/types';
+import type { AiSuggestion, DatesApi, Day, GroupPrefs, ItineraryApi, ItineraryItemCat } from '@/types';
 
 const CAT_ICONS: Record<string, string> = {
   travel: 'plane', stay: 'bed', food: 'utensils', beach: 'waves', activity: 'map-pin',
@@ -30,24 +30,45 @@ interface ItineraryProps {
   groupId: string;
   userId: string;
   api: ItineraryApi;
+  datesApi: DatesApi;
+  members: string[];
+  dest?: string;
+  prefs?: GroupPrefs;
 }
 
-export function Itinerary({ tripId, groupId, userId, api }: ItineraryProps) {
+export function Itinerary({ tripId, groupId, userId, api, datesApi, members, dest, prefs }: ItineraryProps) {
   const [days, setDays] = useState<Day[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDay, setSelectedDay] = useState(1);
   const [addOpen, setAddOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [prefill, setPrefill] = useState<{ start?: string; end?: string }>({});
 
   const reload = useCallback(async () => {
     try {
-      setDays(await api.listDays(tripId));
+      const list = await api.listDays(tripId);
+      setDays(list);
+      if (list.length === 0) {
+        // Prefill the day-builder from the crew's confirmed (or leading) dates
+        try {
+          const options = await datesApi.list(tripId);
+          const confirmed = members.length > 0
+            ? options.find((o) => members.every((m) => o.votes.includes(m)))
+            : undefined;
+          const leading = confirmed
+            ?? [...options].sort((a, b) => b.votes.length - a.votes.length).find((o) => o.votes.length > 0)
+            ?? options[0];
+          if (leading?.startDate && leading?.endDate) {
+            setPrefill({ start: leading.startDate, end: leading.endDate });
+          }
+        } catch { /* dates are a nice-to-have here */ }
+      }
     } catch (e) {
       console.error(e);
     } finally {
       setLoading(false);
     }
-  }, [api, tripId]);
+  }, [api, datesApi, members, tripId]);
 
   useEffect(() => { reload(); }, [reload]);
 
@@ -70,7 +91,7 @@ export function Itinerary({ tripId, groupId, userId, api }: ItineraryProps) {
 
   // No days yet — set up the day-by-day plan from a date range
   if (days.length === 0) {
-    return <SetupDays onSetup={(start, end) => run(() => api.setupDays(tripId, groupId, start, end))} />;
+    return <SetupDays initialStart={prefill.start} initialEnd={prefill.end} onSetup={(start, end) => run(() => api.setupDays(tripId, groupId, start, end))} />;
   }
 
   const day = days.find((d) => d.n === selectedDay) ?? days[0];
@@ -214,6 +235,10 @@ export function Itinerary({ tripId, groupId, userId, api }: ItineraryProps) {
       <AddItemSheet
         open={addOpen}
         dayN={day.n}
+        dayDate={day.date}
+        tripId={tripId}
+        dest={dest}
+        prefs={prefs}
         onClose={() => setAddOpen(false)}
         onAdd={(input) => {
           setAddOpen(false);
@@ -224,9 +249,17 @@ export function Itinerary({ tripId, groupId, userId, api }: ItineraryProps) {
   );
 }
 
-function SetupDays({ onSetup }: { onSetup: (start: string, end: string) => void }) {
-  const [start, setStart] = useState('');
-  const [end, setEnd] = useState('');
+function SetupDays({ initialStart, initialEnd, onSetup }: {
+  initialStart?: string; initialEnd?: string;
+  onSetup: (start: string, end: string) => void;
+}) {
+  const [start, setStart] = useState(initialStart ?? '');
+  const [end, setEnd] = useState(initialEnd ?? '');
+  // Dates can arrive after first render (fetched from the votes)
+  useEffect(() => {
+    if (initialStart) setStart((v) => v || initialStart);
+    if (initialEnd) setEnd((v) => v || initialEnd);
+  }, [initialStart, initialEnd]);
   const valid = start && end && end >= start;
 
   return (
@@ -237,12 +270,12 @@ function SetupDays({ onSetup }: { onSetup: (start: string, end: string) => void 
         </div>
         <p style={{ fontFamily: 'var(--serif)', fontSize: 19, marginBottom: 6 }}>Build your day-by-day plan</p>
         <p className="hdr-sub" style={{ marginBottom: 18 }}>
-          Set the trip dates and Jaunt lays out a card for every day. (Tip: confirm dates with the crew in the Dates tab first.)
+          Set the trip dates and Jaunt lays out a card for every day.{initialStart ? " We've pre-filled the crew's top-voted dates." : ""}
         </p>
         <div style={{ display: 'flex', gap: 10, textAlign: 'left' }}>
           <div style={{ flex: 1 }}>
             <label style={{ fontSize: 13, color: 'var(--ink-soft)', display: 'block', marginBottom: 6 }}>First day</label>
-            <input className="input" type="date" value={start} onChange={(e) => setStart(e.target.value)} />
+            <input className="input" type="date" value={start} onChange={(e) => { const v = e.target.value; setStart(v); if (v && (!end || end < v)) setEnd(v); }} />
           </div>
           <div style={{ flex: 1 }}>
             <label style={{ fontSize: 13, color: 'var(--ink-soft)', display: 'block', marginBottom: 6 }}>Last day</label>
@@ -262,14 +295,45 @@ function SetupDays({ onSetup }: { onSetup: (start: string, end: string) => void 
   );
 }
 
-function AddItemSheet({ open, dayN, onClose, onAdd }: {
-  open: boolean; dayN: number; onClose: () => void;
+function AddItemSheet({ open, dayN, dayDate, tripId, dest, prefs, onClose, onAdd }: {
+  open: boolean; dayN: number; dayDate?: string; tripId: string;
+  dest?: string; prefs?: GroupPrefs; onClose: () => void;
   onAdd: (input: { time?: string; title: string; place?: string; cat: ItineraryItemCat }) => void;
 }) {
   const [title, setTitle] = useState('');
   const [place, setPlace] = useState('');
   const [time, setTime] = useState('');
   const [cat, setCat] = useState<ItineraryItemCat>('activity');
+  const [ideas, setIdeas] = useState<AiSuggestion[] | null>(null);
+  const [loadingIdeas, setLoadingIdeas] = useState(false);
+
+  const askAi = async () => {
+    const where = dest || 'our destination';
+    const when = dayDate ? ` around ${dayDate}` : '';
+    const queries: Record<ItineraryItemCat, string> = {
+      travel: `Flights or transport options to ${where}${when} — a few realistic routes with rough indicative prices`,
+      food: `Well-reviewed restaurants in ${where} worth booking${when}`,
+      stay: `Great places to stay in ${where}`,
+      beach: `Best beaches or outdoor spots around ${where}`,
+      activity: `Top-rated things to do in ${where}${when}`,
+    };
+    setLoadingIdeas(true);
+    setIdeas(null);
+    try {
+      const res = await fetch('/api/discover', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: queries[cat], dest, prefs, tripId }),
+      });
+      const body = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(body?.error ?? 'The assistant is unavailable right now');
+      setIdeas(body?.suggestions ?? []);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'The assistant is unavailable right now');
+    } finally {
+      setLoadingIdeas(false);
+    }
+  };
 
   return (
     <Sheet open={open} onClose={onClose}>
@@ -297,6 +361,46 @@ function AddItemSheet({ open, dayN, onClose, onAdd }: {
           </button>
         ))}
       </div>
+
+      {/* AI assist */}
+      <button
+        className="btn ghost sm"
+        style={{ width: '100%', marginTop: 16, gap: 6 }}
+        disabled={loadingIdeas}
+        onClick={askAi}
+      >
+        <Icon name="sparkles" size={14} color="var(--gold)" />
+        {loadingIdeas ? 'Asking the trip assistant…' : `Suggest ${cat === 'food' ? 'restaurants' : cat === 'travel' ? 'flights & transport' : cat === 'stay' ? 'stays' : 'ideas'} with AI`}
+      </button>
+      {ideas && ideas.length === 0 && (
+        <p style={{ fontSize: 12.5, color: 'var(--ink-faint)', textAlign: 'center', marginTop: 8 }}>
+          No suggestions this time — try asking in Discover.
+        </p>
+      )}
+      {ideas && ideas.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10 }}>
+          {ideas.map((idea, i) => (
+            <button
+              key={i}
+              onClick={() => {
+                setTitle(idea.title + (idea.price ? ` (${idea.price})` : ''));
+                setPlace(idea.area);
+                setIdeas(null);
+              }}
+              style={{
+                textAlign: 'left', padding: '10px 12px', background: 'var(--surface-2)',
+                borderRadius: 12, border: '1px solid var(--line-2)',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                <p style={{ fontSize: 13.5, fontWeight: 600 }}>{idea.title}</p>
+                {idea.price && <p style={{ fontSize: 12.5, fontWeight: 700, flexShrink: 0 }}>{idea.price}</p>}
+              </div>
+              <p style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 2 }}>{idea.area} — {idea.detail}</p>
+            </button>
+          ))}
+        </div>
+      )}
 
       <button
         className="btn"

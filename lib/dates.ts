@@ -32,13 +32,18 @@ export function formatDayLabel(iso: string): string {
   return `${MONTHS[d.getMonth()]} ${d.getDate()}`;
 }
 
-// ISO dates from start to end inclusive
+// ISO dates from start to end inclusive. Built from local date parts —
+// toISOString() converts to UTC, which shifts the day for anyone east of
+// Greenwich (an Apr 5 start rendered as Apr 4 in Sydney).
 export function dateRange(startIso: string, endIso: string): string[] {
   const out: string[] = [];
   const d = parse(startIso);
   const end = parse(endIso);
   while (d.getTime() <= end.getTime() && out.length < 60) {
-    out.push(d.toISOString().slice(0, 10));
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    out.push(`${y}-${m}-${day}`);
     d.setDate(d.getDate() + 1);
   }
   return out;

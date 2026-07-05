@@ -272,14 +272,14 @@ export function DiscoverScreen({ saved, onSave, onAdd, dest, prefs, tripId, grou
 }
 
 const SUGGESTION_TINTS: Record<string, string> = {
-  stay: '#9aa56a', eat: '#cf9a5e', activity: '#7fa0c0',
+  stay: '#9aa56a', eat: '#cf9a5e', activity: '#7fa0c0', travel: '#7fa39a',
 };
 
 function AiSuggestionCard({ suggestion, pinned, onPin }: {
   suggestion: AiSuggestion; pinned: boolean; onPin: () => void;
 }) {
-  const kindLabel: Record<string, string> = { stay: 'Stay', eat: 'Eats', activity: 'To do' };
-  const kindIcon: Record<string, string> = { stay: 'bed', eat: 'utensils', activity: 'waves' };
+  const kindLabel: Record<string, string> = { stay: 'Stay', eat: 'Eats', activity: 'To do', travel: 'Travel' };
+  const kindIcon: Record<string, string> = { stay: 'bed', eat: 'utensils', activity: 'waves', travel: 'plane' };
 
   return (
     <div className="card" style={{ padding: 'var(--cardpad)' }}>
@@ -344,8 +344,8 @@ function SuggestCard({
   card: DiscoverCard; isSaved: boolean; isAdded: boolean;
   onSave: () => void; onAdd: () => void;
 }) {
-  const kindLabel: Record<string, string> = { stay: 'Stay', eat: 'Eats', activity: 'To do' };
-  const kindIcon: Record<string, string> = { stay: 'bed', eat: 'utensils', activity: 'waves' };
+  const kindLabel: Record<string, string> = { stay: 'Stay', eat: 'Eats', activity: 'To do', travel: 'Travel' };
+  const kindIcon: Record<string, string> = { stay: 'bed', eat: 'utensils', activity: 'waves', travel: 'plane' };
 
   return (
     <div className="card">

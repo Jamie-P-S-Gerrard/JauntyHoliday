@@ -59,6 +59,16 @@ export function demoDiscoverReply(query: string, dest?: string): DemoReply & {
 } {
   // Non-Lombok trips get generic destination-flavoured demo suggestions so
   // the whole flow is testable offline.
+  if (/flight|transport|airport|train/i.test(query)) {
+    const place = dest || 'your destination';
+    return {
+      text: 'A few ways to get to ' + place + ' — prices are rough demo figures.' + DEMO_SUFFIX,
+      suggestions: [
+        { title: 'Direct flight, morning departure', area: 'SYD to ' + place, detail: 'Fastest option; book 6+ weeks out for the best fares.', price: '~$450pp', kind: 'travel' },
+        { title: 'One-stop via hub, evening', area: 'SYD to ' + place, detail: 'Cheaper but adds 4-5 hours.', price: '~$320pp', kind: 'travel' },
+      ],
+    };
+  }
   if (dest && !/lombok/i.test(dest)) {
     return {
       text: `Here are a few ideas for ${dest} to get the crew dreaming.` + DEMO_SUFFIX,

@@ -216,7 +216,7 @@ function ProposeSheet({ open, onClose, onPropose }: {
       <div style={{ display: 'flex', gap: 10 }}>
         <div style={{ flex: 1 }}>
           <label style={{ fontSize: 13, color: 'var(--ink-soft)', display: 'block', marginBottom: 6 }}>From</label>
-          <input className="input" type="date" value={start} onChange={(e) => setStart(e.target.value)} />
+          <input className="input" type="date" value={start} onChange={(e) => { const v = e.target.value; setStart(v); if (v && (!end || end < v)) setEnd(v); }} />
         </div>
         <div style={{ flex: 1 }}>
           <label style={{ fontSize: 13, color: 'var(--ink-soft)', display: 'block', marginBottom: 6 }}>To</label>

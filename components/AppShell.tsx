@@ -19,10 +19,10 @@ import { RealTripHome } from './screens/RealTripHome';
 import {
   fetchGroups, createGroupDb, joinGroupDb, createTripDb,
   markTripReadyDb, savePrefsDb, dbDatesApi, dbBoardApi,
-  dbItineraryApi, dbStaysApi,
+  dbItineraryApi, dbStaysApi, dbEventsApi, dbChatApi,
 } from '@/lib/db';
 import {
-  demoDatesApi, demoBoardApi, demoItineraryApi, demoStaysApi,
+  demoDatesApi, demoBoardApi, demoItineraryApi, demoStaysApi, demoEventsApi, demoChatApi,
 } from '@/lib/demo-apis';
 import type { AppStage, AppTab, Group, GroupPrefs, TripSummary } from '@/types';
 
@@ -43,6 +43,8 @@ export function AppShell() {
   const boardApi = configured ? dbBoardApi : demoBoardApi;
   const itinApi = configured ? dbItineraryApi : demoItineraryApi;
   const staysApi = configured ? dbStaysApi : demoStaysApi;
+  const eventsApi = configured ? dbEventsApi : demoEventsApi;
+  const chatApi = configured ? dbChatApi : demoChatApi;
 
   const activeGroup = groups.find((g) => g.id === activeGroupId) ?? null;
   const activeTrip = activeGroup?.trips.find((t) => t.id === activeTripId) ?? null;
@@ -268,6 +270,9 @@ export function AppShell() {
           {stage === 'group' && activeGroup && (
             <GroupScreen
               group={activeGroup}
+              userId={userId}
+              eventsApi={eventsApi}
+              chatApi={chatApi}
               onBack={() => setStage('groups')}
               onOpenTrip={openTrip}
               onCreateTrip={createTrip}
@@ -307,6 +312,7 @@ export function AppShell() {
                     userId={userId}
                     staysApi={staysApi}
                     itinApi={itinApi}
+                    chatApi={chatApi}
                     onSwitch={() => setStage('group')}
                     go={setTab}
                   />
@@ -341,6 +347,10 @@ export function AppShell() {
                   userId={userId}
                   boardApi={boardApi}
                   itinApi={itinApi}
+                  datesApi={datesApi}
+                  members={activeGroup.members}
+                  dest={activeTrip.dest || undefined}
+                  prefs={activeGroup.prefs}
                 />
               )}
               {tab === 'budget' && <BudgetScreen />}

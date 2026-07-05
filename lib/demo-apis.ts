@@ -2,7 +2,7 @@
 // (no Supabase configured). State survives navigation but not a refresh.
 import { dateRange, formatDayLabel, formatRange, formatSub } from './dates';
 import { DAYS } from './data';
-import type { BoardApi, BoardItem, DateOption, DatesApi, Day, ItineraryApi, Stay, StaysApi } from '@/types';
+import type { BoardApi, BoardItem, ChatApi, ChatMsg, ChatScope, DateOption, DatesApi, Day, EventsApi, GroupEvent, ItineraryApi, Stay, StaysApi } from '@/types';
 
 const DEMO_USER = 'j';
 
@@ -189,5 +189,76 @@ export const demoStaysApi: StaysApi = {
     for (const key of Object.keys(stayStore)) {
       stayStore[key] = stayStore[key].filter((x) => x.id !== stayId);
     }
+  },
+};
+
+// ── Events (demo) ─────────────────────────────────────────────────────────────
+
+const eventStore: Record<string, GroupEvent[]> = {
+  g1: [
+    {
+      id: 'ev1', title: 'Dinner & a show', date: '2026-08-14', time: '6:30pm',
+      note: 'Early dinner then the 8pm session.', venue: 'Bar Totti\'s',
+      venueUrl: 'https://example.com/tottis', ticketUrl: 'https://example.com/tickets',
+      tint: '#b07a9a', who: 'c', going: ['c', 'j'],
+    },
+  ],
+};
+
+export const demoEventsApi: EventsApi = {
+  async list(groupId) {
+    await wait();
+    return [...(eventStore[groupId] ?? [])];
+  },
+  async add(groupId, input) {
+    await wait();
+    const list = eventStore[groupId] ?? (eventStore[groupId] = []);
+    list.push({
+      id: `ev${Date.now()}`, tint: '#b07a9a', who: DEMO_USER, going: [DEMO_USER], ...input,
+    });
+  },
+  async rsvp(eventId, going) {
+    await wait();
+    for (const list of Object.values(eventStore)) {
+      const e = list.find((x) => x.id === eventId);
+      if (!e) continue;
+      e.going = going
+        ? (e.going.includes(DEMO_USER) ? e.going : [...e.going, DEMO_USER])
+        : e.going.filter((u) => u !== DEMO_USER);
+    }
+  },
+  async remove(eventId) {
+    await wait();
+    for (const key of Object.keys(eventStore)) {
+      eventStore[key] = eventStore[key].filter((x) => x.id !== eventId);
+    }
+  },
+};
+
+// ── Chat (demo) ───────────────────────────────────────────────────────────────
+
+const chatStore: Record<string, ChatMsg[]> = {
+  'trip:t1': [
+    { id: 'm1', who: 'c', body: 'Should we do the waterfall hike on the north day?', at: new Date(Date.now() - 3600e3).toISOString() },
+    { id: 'm2', who: 'j', body: 'Yes! And Warung Flora after — I\'m starving already.', at: new Date(Date.now() - 3500e3).toISOString() },
+  ],
+};
+
+function chatKey(scope: ChatScope): string {
+  if (scope.eventId) return `event:${scope.eventId}`;
+  if (scope.tripId) return `trip:${scope.tripId}`;
+  return `group:${scope.groupId}`;
+}
+
+export const demoChatApi: ChatApi = {
+  async list(scope) {
+    await wait();
+    return [...(chatStore[chatKey(scope)] ?? [])];
+  },
+  async send(scope, body) {
+    await wait();
+    const key = chatKey(scope);
+    const list = chatStore[key] ?? (chatStore[key] = []);
+    list.push({ id: `m${Date.now()}`, who: DEMO_USER, body, at: new Date().toISOString() });
   },
 };

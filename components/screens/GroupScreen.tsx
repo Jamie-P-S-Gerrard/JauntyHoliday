@@ -5,8 +5,9 @@ import { AvatarStack } from '@/components/ui/Avatar';
 import { Icon } from '@/components/ui/Icon';
 import { Sheet } from '@/components/ui/Sheet';
 import { Placeholder } from '@/components/ui/Placeholder';
+import { GroupEvents } from './GroupEvents';
 import { INTEREST_OPTIONS } from '@/lib/data';
-import type { Group, GroupPrefs, TripSummary, TripStatus } from '@/types';
+import type { ChatApi, EventsApi, Group, GroupPrefs, TripSummary, TripStatus } from '@/types';
 
 const VIBES: Array<{ id: NonNullable<GroupPrefs['vibe']>; label: string }> = [
   { id: 'cozy',      label: 'Cozy getaway' },
@@ -30,13 +31,16 @@ const TRIP_TINTS = ['#caa37a', '#7fa0c0', '#9aa56a', '#b07a9a', '#c77f6a', '#7fa
 
 interface GroupScreenProps {
   group: Group;
+  userId: string;
+  eventsApi: EventsApi;
+  chatApi: ChatApi;
   onBack: () => void;
   onOpenTrip: (t: TripSummary) => void;
   onCreateTrip: (t: TripSummary) => void;
   onUpdatePrefs: (p: GroupPrefs) => void;
 }
 
-export function GroupScreen({ group, onBack, onOpenTrip, onCreateTrip, onUpdatePrefs }: GroupScreenProps) {
+export function GroupScreen({ group, userId, eventsApi, chatApi, onBack, onOpenTrip, onCreateTrip, onUpdatePrefs }: GroupScreenProps) {
   const [newTripOpen, setNewTripOpen] = useState(false);
   const [prefsOpen, setPrefsOpen] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -122,6 +126,9 @@ export function GroupScreen({ group, onBack, onOpenTrip, onCreateTrip, onUpdateP
             </button>
           ))}
         </div>
+
+        {/* Events — quick single-date outings */}
+        <GroupEvents groupId={group.id} userId={userId} api={eventsApi} chatApi={chatApi} />
 
         {/* Preferences */}
         <div className="sec-head">
