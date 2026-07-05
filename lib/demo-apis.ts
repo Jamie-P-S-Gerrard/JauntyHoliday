@@ -123,20 +123,20 @@ export const demoItineraryApi: ItineraryApi = {
       items: [],
     }));
   },
-  async addItem(dayId, { time, title, place, cat }) {
+  async addItem(dayId, { time, title, place, cat, url }) {
     await wait();
     for (const days of Object.values(dayStore)) {
       const day = days.find((d) => d.id === dayId);
       if (day) {
         day.items.push({
-          id: `i${Date.now()}`, t: time || '–', title, place: place ?? '',
+          id: `i${Date.now()}`, t: time || '–', title, place: place ?? '', url,
           cat, who: DEMO_USER, likes: 0, liked: false, comments: 0,
         });
         day.items.sort((a, b) => (a.t === '–' ? '99:99' : a.t).localeCompare(b.t === '–' ? '99:99' : b.t));
       }
     }
   },
-  async updateItem(itemId, { time, title, place, cat }) {
+  async updateItem(itemId, { time, title, place, cat, url }) {
     await wait();
     for (const days of Object.values(dayStore)) {
       for (const day of days) {
@@ -146,6 +146,7 @@ export const demoItineraryApi: ItineraryApi = {
           item.title = title;
           item.place = place ?? '';
           item.cat = cat;
+          item.url = url;
         }
       }
     }

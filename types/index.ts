@@ -215,6 +215,7 @@ export interface ItineraryItem {
   t: string;
   title: string;
   place: string;
+  url?: string;
   cat: ItineraryItemCat;
   who: UserId;
   likes: number;
@@ -234,8 +235,8 @@ export interface Day {
 export interface ItineraryApi {
   listDays(tripId: string): Promise<Day[]>;
   setupDays(tripId: string, groupId: string, start: string, end: string): Promise<void>;
-  addItem(dayId: string, input: { time?: string; title: string; place?: string; cat: ItineraryItemCat }): Promise<void>;
-  updateItem(itemId: string, input: { time?: string; title: string; place?: string; cat: ItineraryItemCat }): Promise<void>;
+  addItem(dayId: string, input: { time?: string; title: string; place?: string; cat: ItineraryItemCat; url?: string }): Promise<void>;
+  updateItem(itemId: string, input: { time?: string; title: string; place?: string; cat: ItineraryItemCat; url?: string }): Promise<void>;
   removeItem(itemId: string): Promise<void>;
   toggleLike(itemId: string, liked: boolean): Promise<void>;
 }
@@ -249,12 +250,13 @@ export interface Stay {
   cost?: number;
   status: StayStatus;
   who: UserId | null;
+  url?: string;
 }
 
 export interface StaysApi {
   list(tripId: string): Promise<Stay[]>;
-  add(tripId: string, groupId: string, input: { title: string; area?: string; cost?: number; status: StayStatus }): Promise<void>;
-  update(stayId: string, input: { title: string; area?: string; cost?: number }): Promise<void>;
+  add(tripId: string, groupId: string, input: { title: string; area?: string; cost?: number; status: StayStatus; url?: string }): Promise<void>;
+  update(stayId: string, input: { title: string; area?: string; cost?: number; url?: string }): Promise<void>;
   setStatus(stayId: string, status: StayStatus): Promise<void>;
   remove(stayId: string): Promise<void>;
 }

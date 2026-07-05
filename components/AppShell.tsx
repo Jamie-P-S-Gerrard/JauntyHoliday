@@ -18,7 +18,7 @@ import { supabaseConfigured } from '@/lib/supabase/configured';
 import { RealTripHome } from './screens/RealTripHome';
 import {
   fetchGroups, createGroupDb, joinGroupDb, createTripDb,
-  markTripReadyDb, savePrefsDb, dbDatesApi, dbBoardApi,
+  markTripReadyDb, updateTripDb, savePrefsDb, dbDatesApi, dbBoardApi,
   dbItineraryApi, dbStaysApi, dbEventsApi, dbChatApi, dbHistoryApi,
 } from '@/lib/db';
 import {
@@ -182,6 +182,22 @@ export function AppShell() {
     setStage('setup');
   };
 
+  const updateTrip = async (tripId: string, input: { dest: string; when: string }) => {
+    if (!activeGroup) return;
+    updateGroup(activeGroup.id, (g) => ({
+      ...g,
+      trips: g.trips.map((t) => (t.id === tripId ? { ...t, dest: input.dest, when: input.when } : t)),
+    })); // optimistic
+    if (configured) {
+      try {
+        await updateTripDb(tripId, input);
+      } catch (e) {
+        toast(e instanceof Error ? e.message : 'Could not save the trip');
+        loadData();
+      }
+    }
+  };
+
   const updatePrefs = async (p: GroupPrefs) => {
     if (!activeGroup) return;
     updateGroup(activeGroup.id, (g) => ({ ...g, prefs: p })); // optimistic
@@ -278,6 +294,7 @@ export function AppShell() {
               onBack={() => setStage('groups')}
               onOpenTrip={openTrip}
               onCreateTrip={createTrip}
+              onUpdateTrip={updateTrip}
               onUpdatePrefs={updatePrefs}
             />
           )}
@@ -362,6 +379,19 @@ export function AppShell() {
             </>
           )}
         </div>
+
+        {/* Demo mode is easy to miss — make it unmissable */}
+        {!configured && stage !== 'login' && (
+          <div style={{
+            position: 'fixed', top: 10, left: '50%', transform: 'translateX(-50%)',
+            zIndex: 80, background: 'var(--gold-bg)', color: 'var(--ink)',
+            border: '1px solid var(--gold)', borderRadius: 999,
+            padding: '5px 14px', fontSize: 11.5, fontWeight: 700,
+            whiteSpace: 'nowrap', pointerEvents: 'none',
+          }}>
+            Demo mode — changes are not saved
+          </div>
+        )}
 
         <Toaster />
       </div>

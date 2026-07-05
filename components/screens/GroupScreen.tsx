@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Wordmark } from '@/components/ui/Wordmark';
 import { AvatarStack } from '@/components/ui/Avatar';
 import { Icon } from '@/components/ui/Icon';
@@ -39,11 +39,13 @@ interface GroupScreenProps {
   onBack: () => void;
   onOpenTrip: (t: TripSummary) => void;
   onCreateTrip: (t: TripSummary) => void;
+  onUpdateTrip: (tripId: string, input: { dest: string; when: string }) => void;
   onUpdatePrefs: (p: GroupPrefs) => void;
 }
 
-export function GroupScreen({ group, userId, eventsApi, chatApi, historyApi, onBack, onOpenTrip, onCreateTrip, onUpdatePrefs }: GroupScreenProps) {
+export function GroupScreen({ group, userId, eventsApi, chatApi, historyApi, onBack, onOpenTrip, onCreateTrip, onUpdateTrip, onUpdatePrefs }: GroupScreenProps) {
   const [newTripOpen, setNewTripOpen] = useState(false);
+  const [editTrip, setEditTrip] = useState<TripSummary | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [prefsOpen, setPrefsOpen] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -128,6 +130,14 @@ export function GroupScreen({ group, userId, eventsApi, chatApi, historyApi, onB
                 <span className={`chip ${t.status === 'Active' ? 'olive' : t.status === 'Planning' ? 'terra' : 'gold'}`} style={{ height: 24, fontSize: 11 }}>
                   {t.status}
                 </span>
+                <span
+                  role="button"
+                  aria-label={'Edit trip ' + (t.dest || 'details')}
+                  onClick={(e) => { e.stopPropagation(); setEditTrip(t); }}
+                  style={{ opacity: 0.5, padding: 4, display: 'inline-flex' }}
+                >
+                  <Icon name="edit" size={13} color="var(--ink-soft)" />
+                </span>
                 <Icon name="chevron-right" size={16} color="var(--ink-faint)" />
               </div>
             </button>
@@ -170,10 +180,17 @@ export function GroupScreen({ group, userId, eventsApi, chatApi, historyApi, onB
       />
 
       <NewTripSheet
-        open={newTripOpen}
-        onClose={() => setNewTripOpen(false)}
+        open={newTripOpen || !!editTrip}
+        initial={editTrip}
+        onClose={() => { setNewTripOpen(false); setEditTrip(null); }}
         nextTint={TRIP_TINTS[group.trips.length % TRIP_TINTS.length]}
-        onCreate={(t) => { setNewTripOpen(false); onCreateTrip(t); }}
+        onCreate={(t) => {
+          const editingId = editTrip?.id;
+          setNewTripOpen(false);
+          setEditTrip(null);
+          if (editingId) onUpdateTrip(editingId, { dest: t.dest, when: t.when });
+          else onCreateTrip(t);
+        }}
       />
       <PrefsSheet
         open={prefsOpen}
@@ -185,11 +202,18 @@ export function GroupScreen({ group, userId, eventsApi, chatApi, historyApi, onB
   );
 }
 
-function NewTripSheet({ open, onClose, onCreate, nextTint }: {
-  open: boolean; onClose: () => void; onCreate: (t: TripSummary) => void; nextTint: string;
+function NewTripSheet({ open, initial, onClose, onCreate, nextTint }: {
+  open: boolean; initial?: TripSummary | null; onClose: () => void;
+  onCreate: (t: TripSummary) => void; nextTint: string;
 }) {
   const [dest, setDest] = useState('');
   const [when, setWhen] = useState('');
+
+  useEffect(() => {
+    if (!open) return;
+    setDest(initial?.dest ?? '');
+    setWhen(initial?.when ?? '');
+  }, [open, initial]);
 
   const create = () => {
     const t: TripSummary = {
@@ -206,13 +230,13 @@ function NewTripSheet({ open, onClose, onCreate, nextTint }: {
 
   return (
     <Sheet open={open} onClose={onClose}>
-      <h2 className="sec-title" style={{ marginBottom: 20 }}>New trip</h2>
+      <h2 className="sec-title" style={{ marginBottom: 20 }}>{initial ? 'Edit trip details' : 'New trip'}</h2>
       <label style={{ fontSize: 13, color: 'var(--ink-soft)', display: 'block', marginBottom: 6 }}>Where to? <span style={{ color: 'var(--ink-faint)' }}>(leave blank to decide together)</span></label>
       <input className="input" placeholder="e.g. Lombok, Indonesia" value={dest} onChange={(e) => setDest(e.target.value)} />
       <label style={{ fontSize: 13, color: 'var(--ink-soft)', display: 'block', margin: '16px 0 6px' }}>Roughly when?</label>
       <input className="input" placeholder="e.g. Oct 2026" value={when} onChange={(e) => setWhen(e.target.value)} />
       <button className="btn" style={{ width: '100%', marginTop: 24 }} onClick={create}>
-        Create trip
+        {initial ? 'Save changes' : 'Create trip'}
       </button>
     </Sheet>
   );

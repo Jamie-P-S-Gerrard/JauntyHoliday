@@ -41,7 +41,7 @@ export function Itinerary({ tripId, groupId, userId, api, datesApi, members, des
   const [loading, setLoading] = useState(true);
   const [selectedDay, setSelectedDay] = useState(1);
   const [addOpen, setAddOpen] = useState(false);
-  const [editItem, setEditItem] = useState<{ id: string; time?: string; title: string; place?: string; cat: ItineraryItemCat } | null>(null);
+  const [editItem, setEditItem] = useState<{ id: string; time?: string; title: string; place?: string; cat: ItineraryItemCat; url?: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [prefill, setPrefill] = useState<{ start?: string; end?: string }>({});
 
@@ -185,6 +185,7 @@ export function Itinerary({ tripId, groupId, userId, api, datesApi, members, des
                           title: item.title,
                           place: item.place || undefined,
                           cat: item.cat,
+                          url: item.url,
                         })}
                         aria-label="Edit plan"
                         style={{ opacity: 0.5, padding: 2 }}
@@ -202,12 +203,23 @@ export function Itinerary({ tripId, groupId, userId, api, datesApi, members, des
                       )}
                     </div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
                     {item.place && (
                       <>
                         <Icon name="map-pin" size={11} color="var(--ink-faint)" />
                         <p style={{ fontSize: 12.5, color: 'var(--ink-soft)' }}>{item.place}</p>
                       </>
+                    )}
+                    {item.url && (
+                      <a
+                        className="chip terra"
+                        style={{ height: 24, fontSize: 11, textDecoration: 'none' }}
+                        href={item.url}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        <Icon name="file" size={10} color="var(--terra-ink)" /> Book
+                      </a>
                     )}
                     <div style={{ marginLeft: 'auto', display: 'flex' }}>
                       <Avatar userId={item.who} size="sm" />
@@ -317,14 +329,15 @@ function SetupDays({ initialStart, initialEnd, onSetup }: {
 function AddItemSheet({ open, dayN, dayDate, tripId, dest, prefs, initial, onClose, onAdd }: {
   open: boolean; dayN: number; dayDate?: string; tripId: string;
   dest?: string; prefs?: GroupPrefs;
-  initial?: { id: string; time?: string; title: string; place?: string; cat: ItineraryItemCat } | null;
+  initial?: { id: string; time?: string; title: string; place?: string; cat: ItineraryItemCat; url?: string } | null;
   onClose: () => void;
-  onAdd: (input: { time?: string; title: string; place?: string; cat: ItineraryItemCat }) => void;
+  onAdd: (input: { time?: string; title: string; place?: string; cat: ItineraryItemCat; url?: string }) => void;
 }) {
   const [title, setTitle] = useState('');
   const [place, setPlace] = useState('');
   const [time, setTime] = useState('');
   const [cat, setCat] = useState<ItineraryItemCat>('activity');
+  const [url, setUrl] = useState('');
   const [ideas, setIdeas] = useState<AiSuggestion[] | null>(null);
   const [loadingIdeas, setLoadingIdeas] = useState(false);
 
@@ -335,6 +348,7 @@ function AddItemSheet({ open, dayN, dayDate, tripId, dest, prefs, initial, onClo
     setPlace(initial?.place ?? '');
     setTime(initial?.time ?? '');
     setCat(initial?.cat ?? 'activity');
+    setUrl(initial?.url ?? '');
     setIdeas(null);
   }, [open, initial]);
 
@@ -382,6 +396,9 @@ function AddItemSheet({ open, dayN, dayDate, tripId, dest, prefs, initial, onClo
           <input className="input" type="time" value={time} onChange={(e) => setTime(e.target.value)} />
         </div>
       </div>
+
+      <label style={{ fontSize: 13, color: 'var(--ink-soft)', display: 'block', margin: '14px 0 6px' }}>Booking link <span style={{ color: 'var(--ink-faint)' }}>(optional)</span></label>
+      <input className="input" type="url" placeholder="https://…" value={url} onChange={(e) => setUrl(e.target.value)} />
 
       <label style={{ fontSize: 13, color: 'var(--ink-soft)', display: 'block', margin: '14px 0 8px' }}>Type</label>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -438,8 +455,8 @@ function AddItemSheet({ open, dayN, dayDate, tripId, dest, prefs, initial, onClo
         disabled={!title.trim()}
         style={{ width: '100%', marginTop: 24 }}
         onClick={() => {
-          onAdd({ time: time || undefined, title: title.trim(), place: place.trim() || undefined, cat });
-          setTitle(''); setPlace(''); setTime(''); setCat('activity');
+          onAdd({ time: time || undefined, title: title.trim(), place: place.trim() || undefined, cat, url: url.trim() || undefined });
+          setTitle(''); setPlace(''); setTime(''); setCat('activity'); setUrl('');
         }}
       >
         {initial ? 'Save changes' : 'Add to the plan'}

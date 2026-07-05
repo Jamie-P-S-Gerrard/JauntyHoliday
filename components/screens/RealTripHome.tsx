@@ -138,6 +138,18 @@ export function RealTripHome({
                 <p style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 1 }}>
                   {[s.area, s.cost ? '$' + s.cost : null].filter(Boolean).join(' · ') || 'Tap to edit'}
                 </p>
+                {s.url && (
+                  <a
+                    className="chip terra"
+                    style={{ height: 22, fontSize: 10.5, textDecoration: 'none', marginTop: 4, display: 'inline-flex' }}
+                    href={s.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Icon name="file" size={10} color="var(--terra-ink)" /> Book
+                  </a>
+                )}
               </button>
               <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
                 <button
@@ -203,7 +215,7 @@ export function RealTripHome({
           setAddStayOpen(false);
           setEditStay(null);
           run(() => (editingId
-            ? staysApi.update(editingId, { title: input.title, area: input.area, cost: input.cost })
+            ? staysApi.update(editingId, { title: input.title, area: input.area, cost: input.cost, url: input.url })
             : staysApi.add(tripId, groupId, input)));
         }}
       />
@@ -213,12 +225,13 @@ export function RealTripHome({
 
 function AddStaySheet({ open, initial, onClose, onAdd }: {
   open: boolean; initial?: Stay | null; onClose: () => void;
-  onAdd: (input: { title: string; area?: string; cost?: number; status: StayStatus }) => void;
+  onAdd: (input: { title: string; area?: string; cost?: number; status: StayStatus; url?: string }) => void;
 }) {
   const [title, setTitle] = useState('');
   const [area, setArea] = useState('');
   const [cost, setCost] = useState('');
   const [status, setStatus] = useState<StayStatus>('todo');
+  const [url, setUrl] = useState('');
 
   useEffect(() => {
     if (!open) return;
@@ -226,6 +239,7 @@ function AddStaySheet({ open, initial, onClose, onAdd }: {
     setArea(initial?.area ?? '');
     setCost(initial?.cost != null ? String(initial.cost) : '');
     setStatus(initial?.status ?? 'todo');
+    setUrl(initial?.url ?? '');
   }, [open, initial]);
 
   return (
@@ -244,6 +258,9 @@ function AddStaySheet({ open, initial, onClose, onAdd }: {
           <input className="input" type="number" placeholder="940" value={cost} onChange={(e) => setCost(e.target.value)} />
         </div>
       </div>
+
+      <label style={{ fontSize: 13, color: 'var(--ink-soft)', display: 'block', margin: '14px 0 6px' }}>Booking link <span style={{ color: 'var(--ink-faint)' }}>(optional)</span></label>
+      <input className="input" type="url" placeholder="https://…" value={url} onChange={(e) => setUrl(e.target.value)} />
 
       {!initial && (
         <>
@@ -268,8 +285,9 @@ function AddStaySheet({ open, initial, onClose, onAdd }: {
             area: area.trim() || undefined,
             cost: cost ? Number(cost) : undefined,
             status,
+            url: url.trim() || undefined,
           });
-          setTitle(''); setArea(''); setCost(''); setStatus('todo');
+          setTitle(''); setArea(''); setCost(''); setStatus('todo'); setUrl('');
         }}
       >
         {initial ? 'Save changes' : 'Add stay'}

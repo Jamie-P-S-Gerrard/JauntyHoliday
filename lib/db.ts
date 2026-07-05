@@ -123,6 +123,15 @@ export async function createTripDb(groupId: string, dest: string, when: string, 
   if (error) throw error;
 }
 
+export async function updateTripDb(tripId: string, input: { dest: string; when: string }): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.from('trips').update({
+    dest: input.dest || null,
+    when_label: input.when || null,
+  }).eq('id', tripId);
+  if (error) throw error;
+}
+
 export async function markTripReadyDb(tripId: string): Promise<void> {
   const supabase = createClient();
   const { error } = await supabase
@@ -287,7 +296,7 @@ export const dbItineraryApi: ItineraryApi = {
     const { data: { user } } = await supabase.auth.getUser();
     const { data, error } = await supabase
       .from('days')
-      .select('id, day_number, date_label, title, area, itinerary_items ( id, time_label, title, place, cat, who, sort_order, item_likes ( user_id ) )')
+      .select('id, day_number, date_label, title, area, itinerary_items ( id, time_label, title, place, cat, who, sort_order, url, item_likes ( user_id ) )')
       .eq('trip_id', tripId)
       .order('day_number', { ascending: true });
     if (error) throw error;
@@ -300,12 +309,13 @@ export const dbItineraryApi: ItineraryApi = {
       items: (d.itinerary_items ?? [])
         .sort((a: { sort_order: number | null; time_label: string | null }, b: { sort_order: number | null; time_label: string | null }) =>
           (a.time_label ?? '99:99').localeCompare(b.time_label ?? '99:99'))
-        .map((i: { id: string; time_label: string | null; title: string; place: string | null; cat: string | null; who: string | null; item_likes: Array<{ user_id: string }> }) => ({
+        .map((i: { id: string; time_label: string | null; title: string; place: string | null; cat: string | null; who: string | null; url: string | null; item_likes: Array<{ user_id: string }> }) => ({
           id: i.id,
           t: i.time_label ?? '–',
           title: i.title,
           place: i.place ?? '',
           cat: (i.cat ?? 'activity') as Day['items'][number]['cat'],
+          url: i.url ?? undefined,
           who: i.who ?? '',
           likes: (i.item_likes ?? []).length,
           liked: !!user && (i.item_likes ?? []).some((l: { user_id: string }) => l.user_id === user.id),
@@ -329,7 +339,7 @@ export const dbItineraryApi: ItineraryApi = {
     if (error) throw error;
   },
 
-  async addItem(dayId, { time, title, place, cat }) {
+  async addItem(dayId, { time, title, place, cat, url }) {
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not signed in');
@@ -339,18 +349,20 @@ export const dbItineraryApi: ItineraryApi = {
       title,
       place: place || null,
       cat,
+      url: url || null,
       who: user.id,
     });
     if (error) throw error;
   },
 
-  async updateItem(itemId, { time, title, place, cat }) {
+  async updateItem(itemId, { time, title, place, cat, url }) {
     const supabase = createClient();
     const { error } = await supabase.from('itinerary_items').update({
       time_label: time || null,
       title,
       place: place || null,
       cat,
+      url: url || null,
     }).eq('id', itemId);
     if (error) throw error;
   },
@@ -402,7 +414,7 @@ export const dbStaysApi: StaysApi = {
     if (!budget) return [];
     const { data, error } = await supabase
       .from('bookings')
-      .select('id, title, meta, cost, status, who')
+      .select('id, title, meta, cost, status, who, url')
       .eq('budget_id', budget.id)
       .order('created_at', { ascending: true });
     if (error) throw error;
@@ -413,10 +425,11 @@ export const dbStaysApi: StaysApi = {
       cost: b.cost ?? undefined,
       status: (b.status ?? 'todo') as StayStatus,
       who: b.who,
+      url: b.url ?? undefined,
     }));
   },
 
-  async add(tripId, groupId, { title, area, cost, status }) {
+  async add(tripId, groupId, { title, area, cost, status, url }) {
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not signed in');
@@ -427,17 +440,19 @@ export const dbStaysApi: StaysApi = {
       meta: area || null,
       cost: cost ?? null,
       status,
+      url: url || null,
       who: user.id,
     });
     if (error) throw error;
   },
 
-  async update(stayId, { title, area, cost }) {
+  async update(stayId, { title, area, cost, url }) {
     const supabase = createClient();
     const { error } = await supabase.from('bookings').update({
       title,
       meta: area || null,
       cost: cost ?? null,
+      url: url || null,
     }).eq('id', stayId);
     if (error) throw error;
   },
