@@ -13,7 +13,11 @@ export async function GET(request: NextRequest) {
   const tokenHash = url.searchParams.get('token_hash');
   const type = url.searchParams.get('type') as EmailOtpType | null;
 
-  const home = new URL('/', url.origin);
+  // Behind Railway's proxy, request.url is the internal address
+  // (localhost:8080); the public origin arrives in forwarded headers.
+  const proto = (request.headers.get('x-forwarded-proto') ?? url.protocol.replace(':', '')).split(',')[0].trim();
+  const host = (request.headers.get('x-forwarded-host') ?? url.host).split(',')[0].trim();
+  const home = new URL('/', `${proto}://${host}`);
   const fail = (message: string) => {
     home.searchParams.set('auth_error', message);
     return NextResponse.redirect(home);
