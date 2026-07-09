@@ -56,13 +56,15 @@ RESPONSE FORMAT — reply ONLY with valid JSON, no markdown fences, no preamble:
   "text": "1–3 warm, specific sentences answering the query",
   ${isLombok ? '"cardIds": ["a1"],' : ''}
   "suggestions": [
-    { "title": "Name of place/experience", "area": "Neighbourhood or region", "detail": "One specific, useful sentence", "price": "$40pp", "kind": "stay|eat|activity|travel" }
+    { "title": "Name of place/experience", "area": "Neighbourhood or region", "detail": "One specific, useful sentence", "price": "$40pp", "kind": "stay|eat|activity|travel", "time": "HH:mm", "lat": -8.889, "lng": 116.284 }
   ]${isLombok ? ',\n  "culture": false' : ''}
 }
 
 RULES:
 - "suggestions": 0–3 concrete, real places or experiences that match the query${isLombok ? ' (omit when cardIds already cover it)' : ''}
 - "price" is a short indicative string like "$40pp" or "$$" — omit if unknown
+- "time" is a sensible 24h start time for the plan (e.g. "17:30" for sunset dinner) — omit if none makes sense
+- "lat"/"lng" are your best approximate WGS84 coordinates for the place (numbers, ~3+ decimals) — omit if truly unsure
 - Be specific to ${place} — reference real neighbourhoods, seasons, and local details
 - If no destination is chosen yet, help them choose: suggest destinations as "suggestions" with kind "activity"
 - For flights/transport queries use kind "travel" with realistic routes/airlines and rough indicative prices, and say prices are indicative

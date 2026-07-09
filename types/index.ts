@@ -92,6 +92,11 @@ export interface AiSuggestion {
   detail: string;
   price?: string;
   kind: 'stay' | 'eat' | 'activity' | 'travel';
+  /** Suggested start time, "HH:mm" 24h. */
+  time?: string;
+  /** Approximate WGS84 coordinates of the place. */
+  lat?: number;
+  lng?: number;
 }
 
 // ── Events: lightweight single-date outings proposed to the group ────────────
@@ -204,20 +209,27 @@ export interface CultureCard {
 export interface DiscoverData {
   cards: DiscoverCard[];
   culture: CultureCard;
-  filters: string[];
+  filters: Array<{ id: string; label: string }>;
   prompts: string[];
 }
 
 export type ItineraryItemCat = 'travel' | 'stay' | 'food' | 'beach' | 'activity';
 
+export interface LatLng {
+  lat: number;
+  lng: number;
+}
+
 export interface ItineraryItem {
   id: string;
-  t: string;
+  /** Minutes since midnight (0–1439), or null when not yet scheduled. See lib/time.ts. */
+  time: number | null;
   title: string;
   place: string;
   url?: string;
   cat: ItineraryItemCat;
   who: UserId;
+  coords?: LatLng;
   likes: number;
   liked: boolean;
   comments: number;
@@ -232,11 +244,22 @@ export interface Day {
   items: ItineraryItem[];
 }
 
+export interface ItineraryItemInput {
+  /** "HH:mm" from <input type="time">. */
+  time?: string;
+  title: string;
+  place?: string;
+  cat: ItineraryItemCat;
+  url?: string;
+  lat?: number;
+  lng?: number;
+}
+
 export interface ItineraryApi {
   listDays(tripId: string): Promise<Day[]>;
   setupDays(tripId: string, groupId: string, start: string, end: string): Promise<void>;
-  addItem(dayId: string, input: { time?: string; title: string; place?: string; cat: ItineraryItemCat; url?: string }): Promise<void>;
-  updateItem(itemId: string, input: { time?: string; title: string; place?: string; cat: ItineraryItemCat; url?: string }): Promise<void>;
+  addItem(dayId: string, input: ItineraryItemInput): Promise<void>;
+  updateItem(itemId: string, input: ItineraryItemInput): Promise<void>;
   removeItem(itemId: string): Promise<void>;
   toggleLike(itemId: string, liked: boolean): Promise<void>;
 }

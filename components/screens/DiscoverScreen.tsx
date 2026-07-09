@@ -113,7 +113,7 @@ export function DiscoverScreen({ saved, onSave, onAdd, dest, prefs, tripId, grou
         display: 'flex', gap: 8, padding: '8px var(--pad)',
         overflowX: 'auto', flexShrink: 0,
       }}>
-        {DISCOVER.filters.map((f: any) => (
+        {DISCOVER.filters.map((f) => (
           <button
             key={f.id}
             className={`chip${filter === f.id ? ' on' : ''}`}

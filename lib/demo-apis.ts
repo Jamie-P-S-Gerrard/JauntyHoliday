@@ -1,6 +1,7 @@
 // In-memory implementations of the dates + mood board APIs for demo mode
 // (no Supabase configured). State survives navigation but not a refresh.
 import { dateRange, formatDayLabel, formatRange, formatSub } from './dates';
+import { byTime, timeFromHHMM } from './time';
 import { DAYS } from './data';
 import type { BoardApi, BoardItem, ChangeEntry, ChatApi, ChatMsg, ChatScope, DateOption, DatesApi, Day, EventsApi, GroupEvent, HistoryApi, ItineraryApi, Stay, StaysApi } from '@/types';
 
@@ -123,30 +124,34 @@ export const demoItineraryApi: ItineraryApi = {
       items: [],
     }));
   },
-  async addItem(dayId, { time, title, place, cat, url }) {
+  async addItem(dayId, { time, title, place, cat, url, lat, lng }) {
     await wait();
     for (const days of Object.values(dayStore)) {
       const day = days.find((d) => d.id === dayId);
       if (day) {
         day.items.push({
-          id: `i${Date.now()}`, t: time || '–', title, place: place ?? '', url,
-          cat, who: DEMO_USER, likes: 0, liked: false, comments: 0,
+          id: `i${Date.now()}`, time: timeFromHHMM(time), title, place: place ?? '', url,
+          cat, who: DEMO_USER,
+          coords: lat !== undefined && lng !== undefined ? { lat, lng } : undefined,
+          likes: 0, liked: false, comments: 0,
         });
-        day.items.sort((a, b) => (a.t === '–' ? '99:99' : a.t).localeCompare(b.t === '–' ? '99:99' : b.t));
+        day.items.sort(byTime);
       }
     }
   },
-  async updateItem(itemId, { time, title, place, cat, url }) {
+  async updateItem(itemId, { time, title, place, cat, url, lat, lng }) {
     await wait();
     for (const days of Object.values(dayStore)) {
       for (const day of days) {
         const item = day.items.find((i) => i.id === itemId);
         if (item) {
-          item.t = time || '–';
+          item.time = timeFromHHMM(time);
           item.title = title;
           item.place = place ?? '';
           item.cat = cat;
           item.url = url;
+          item.coords = lat !== undefined && lng !== undefined ? { lat, lng } : item.coords;
+          day.items.sort(byTime);
         }
       }
     }

@@ -38,7 +38,7 @@ export const DISCOVER: DiscoverData = {
     { id: 'eat', label: 'Eats' },
     { id: 'see', label: 'Beaches & sights' },
     { id: 'culture', label: 'Culture' },
-  ] as any,
+  ],
   cards: [
     {
       id: 'a1', cat: 'see', kind: 'activity', title: 'Pink Beach snorkel trip', area: 'Sekotong · SW Lombok',
@@ -84,27 +84,28 @@ export const DISCOVER: DiscoverData = {
   },
 };
 
+// Item times are minutes since midnight (e.g. 14:30 → 870); see lib/time.ts.
 export const DAYS: Day[] = [
   {
     id: 'day1', n: 1, date: 'Oct 3', title: 'Land & settle', area: 'Kuta',
     items: [
-      { id: 'i1', t: '14:30', title: 'Land at Lombok Intl (LOP)', place: 'Praya', cat: 'travel', who: 'j', likes: 0, liked: false, comments: 0 },
-      { id: 'i2', t: '16:00', title: 'Check in — Ashtari Villa', place: 'Kuta', cat: 'stay', who: 'c', likes: 1, liked: true, comments: 0 },
-      { id: 'i3', t: '19:00', title: 'Dinner at Nugges', place: 'Kuta town', cat: 'food', who: 'c', likes: 0, liked: false, comments: 2 },
+      { id: 'i1', time: 870,  title: 'Land at Lombok Intl (LOP)', place: 'Praya', cat: 'travel', who: 'j', coords: { lat: -8.7573, lng: 116.2767 }, likes: 0, liked: false, comments: 0 },
+      { id: 'i2', time: 960,  title: 'Check in — Ashtari Villa', place: 'Kuta', cat: 'stay', who: 'c', coords: { lat: -8.9020, lng: 116.2755 }, likes: 1, liked: true, comments: 0 },
+      { id: 'i3', time: 1140, title: 'Dinner at Nugges', place: 'Kuta town', cat: 'food', who: 'c', coords: { lat: -8.8891, lng: 116.2839 }, likes: 0, liked: false, comments: 2 },
     ],
   },
   {
     id: 'day2', n: 2, date: 'Oct 4', title: 'Beach day', area: 'Selong Belanak',
     items: [
-      { id: 'i4', t: '08:30', title: 'Surf lesson for two', place: 'Selong Belanak', cat: 'beach', who: 'j', likes: 2, liked: true, comments: 0 },
-      { id: 'i5', t: '13:00', title: 'Warung lunch on the sand', place: 'Selong Belanak', cat: 'food', who: 'c', likes: 0, liked: false, comments: 0 },
-      { id: 'i6', t: '17:30', title: 'Sunset at Ashtari café', place: 'Kuta hills', cat: 'beach', who: 'j', likes: 0, liked: false, comments: 1 },
+      { id: 'i4', time: 510,  title: 'Surf lesson for two', place: 'Selong Belanak', cat: 'beach', who: 'j', coords: { lat: -8.8676, lng: 116.2043 }, likes: 2, liked: true, comments: 0 },
+      { id: 'i5', time: 780,  title: 'Warung lunch on the sand', place: 'Selong Belanak', cat: 'food', who: 'c', coords: { lat: -8.8668, lng: 116.2071 }, likes: 0, liked: false, comments: 0 },
+      { id: 'i6', time: 1050, title: 'Sunset at Ashtari café', place: 'Kuta hills', cat: 'beach', who: 'j', coords: { lat: -8.9020, lng: 116.2755 }, likes: 0, liked: false, comments: 1 },
     ],
   },
   {
     id: 'day3', n: 3, date: 'Oct 5', title: 'Pink Beach', area: 'Sekotong',
     items: [
-      { id: 'i7', t: '07:30', title: 'Pink Beach snorkel trip', place: 'Sekotong', cat: 'beach', who: 'c', likes: 2, liked: true, comments: 0 },
+      { id: 'i7', time: 450, title: 'Pink Beach snorkel trip', place: 'Sekotong', cat: 'beach', who: 'c', coords: { lat: -8.7845, lng: 116.0089 }, likes: 2, liked: true, comments: 0 },
     ],
   },
   { id: 'day4', n: 4,  date: 'Oct 6',  title: 'South Gilis',  area: 'Gili Nanggu', items: [] },

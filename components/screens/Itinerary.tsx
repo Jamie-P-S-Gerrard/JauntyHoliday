@@ -1,11 +1,21 @@
 'use client';
 import { toast } from '@/components/ui/Toast';
 import { useCallback, useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { Avatar } from '@/components/ui/Avatar';
 import { Icon } from '@/components/ui/Icon';
 import { Sheet } from '@/components/ui/Sheet';
 import { Placeholder } from '@/components/ui/Placeholder';
-import type { AiSuggestion, DatesApi, Day, GroupPrefs, ItineraryApi, ItineraryItemCat } from '@/types';
+import { formatItemTime, timeToHHMM } from '@/lib/time';
+import type { AiSuggestion, DatesApi, Day, GroupPrefs, ItineraryApi, ItineraryItemCat, ItineraryItemInput, LatLng } from '@/types';
+
+// Leaflet touches `window`, so the map only renders on the client.
+const ItineraryMap = dynamic(() => import('@/components/ui/ItineraryMap'), {
+  ssr: false,
+  loading: () => (
+    <div style={{ height: 190, borderRadius: 'var(--radius-sm)', background: 'var(--surface-2)' }} />
+  ),
+});
 
 const CAT_ICONS: Record<string, string> = {
   travel: 'plane', stay: 'bed', food: 'utensils', beach: 'waves', activity: 'map-pin',
@@ -41,7 +51,7 @@ export function Itinerary({ tripId, groupId, userId, api, datesApi, members, des
   const [loading, setLoading] = useState(true);
   const [selectedDay, setSelectedDay] = useState(1);
   const [addOpen, setAddOpen] = useState(false);
-  const [editItem, setEditItem] = useState<{ id: string; time?: string; title: string; place?: string; cat: ItineraryItemCat; url?: string } | null>(null);
+  const [editItem, setEditItem] = useState<{ id: string; time?: string; title: string; place?: string; cat: ItineraryItemCat; url?: string; coords?: LatLng } | null>(null);
   const [busy, setBusy] = useState(false);
   const [prefill, setPrefill] = useState<{ start?: string; end?: string }>({});
 
@@ -140,8 +150,12 @@ export function Itinerary({ tripId, groupId, userId, api, datesApi, members, des
           )}
         </div>
 
-        {/* Map peek */}
-        {day.items.length > 0 && (
+        {/* Map — real pins (numbered in time order) once items carry coordinates */}
+        {day.items.some((i) => i.coords) ? (
+          <div style={{ marginBottom: 16 }}>
+            <ItineraryMap items={day.items} />
+          </div>
+        ) : day.items.length > 0 && (
           <div style={{ borderRadius: 'var(--radius-sm)', overflow: 'hidden', height: 104, marginBottom: 16, position: 'relative' }}>
             <Placeholder tint="#9aad8a" style={{ position: 'absolute', inset: 0 }} label={day.area} />
             {day.items.map((_, i) => (
@@ -164,7 +178,7 @@ export function Itinerary({ tripId, groupId, userId, api, datesApi, members, des
             {day.items.map((item) => (
               <div key={item.id} style={{ position: 'relative', marginBottom: 12 }}>
                 <div style={{ position: 'absolute', left: -48, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, paddingTop: 14 }}>
-                  <p style={{ fontSize: 10, color: 'var(--ink-faint)', fontWeight: 600, whiteSpace: 'nowrap' }}>{item.t}</p>
+                  <p style={{ fontSize: 10, color: 'var(--ink-faint)', fontWeight: 600, whiteSpace: 'nowrap' }}>{formatItemTime(item)}</p>
                   <div style={{
                     width: 28, height: 28, borderRadius: 8,
                     background: CAT_COLORS[item.cat]?.bg ?? 'var(--surface-2)',
@@ -181,11 +195,12 @@ export function Itinerary({ tripId, groupId, userId, api, datesApi, members, des
                       <button
                         onClick={() => setEditItem({
                           id: item.id,
-                          time: item.t !== '–' ? item.t : undefined,
+                          time: item.time !== null ? timeToHHMM(item.time) : undefined,
                           title: item.title,
                           place: item.place || undefined,
                           cat: item.cat,
                           url: item.url,
+                          coords: item.coords,
                         })}
                         aria-label="Edit plan"
                         style={{ opacity: 0.5, padding: 2 }}
@@ -329,38 +344,44 @@ function SetupDays({ initialStart, initialEnd, onSetup }: {
 function AddItemSheet({ open, dayN, dayDate, tripId, dest, prefs, initial, onClose, onAdd }: {
   open: boolean; dayN: number; dayDate?: string; tripId: string;
   dest?: string; prefs?: GroupPrefs;
-  initial?: { id: string; time?: string; title: string; place?: string; cat: ItineraryItemCat; url?: string } | null;
+  initial?: { id: string; time?: string; title: string; place?: string; cat: ItineraryItemCat; url?: string; coords?: LatLng } | null;
   onClose: () => void;
-  onAdd: (input: { time?: string; title: string; place?: string; cat: ItineraryItemCat; url?: string }) => void;
+  onAdd: (input: ItineraryItemInput) => void;
 }) {
+  // Type is chosen first; the detail step follows (edits jump straight there).
+  const [step, setStep] = useState<'type' | 'detail'>('type');
+  const [cat, setCat] = useState<ItineraryItemCat>('activity');
   const [title, setTitle] = useState('');
   const [place, setPlace] = useState('');
   const [time, setTime] = useState('');
-  const [cat, setCat] = useState<ItineraryItemCat>('activity');
   const [url, setUrl] = useState('');
+  const [coords, setCoords] = useState<LatLng | undefined>(undefined);
   const [ideas, setIdeas] = useState<AiSuggestion[] | null>(null);
   const [loadingIdeas, setLoadingIdeas] = useState(false);
 
   // Hydrate for edit mode (or clear for create) whenever the sheet opens
   useEffect(() => {
     if (!open) return;
+    setStep(initial ? 'detail' : 'type');
     setTitle(initial?.title ?? '');
     setPlace(initial?.place ?? '');
     setTime(initial?.time ?? '');
     setCat(initial?.cat ?? 'activity');
     setUrl(initial?.url ?? '');
+    setCoords(initial?.coords);
     setIdeas(null);
   }, [open, initial]);
 
   const askAi = async () => {
-    const where = dest || 'our destination';
+    const where = [place.trim(), dest].filter(Boolean).join(', ') || 'our destination';
     const when = dayDate ? ` around ${dayDate}` : '';
+    const hint = title.trim() ? ` They have in mind: "${title.trim()}".` : '';
     const queries: Record<ItineraryItemCat, string> = {
-      travel: `Flights or transport options to ${where}${when} — a few realistic routes with rough indicative prices`,
-      food: `Well-reviewed restaurants in ${where} worth booking${when}`,
-      stay: `Great places to stay in ${where}`,
-      beach: `Best beaches or outdoor spots around ${where}`,
-      activity: `Top-rated things to do in ${where}${when}`,
+      travel: `Flights or transport options to ${where}${when} — a few realistic routes with rough indicative prices.${hint}`,
+      food: `Well-reviewed restaurants in ${where} worth booking${when}.${hint}`,
+      stay: `Great places to stay in ${where}.${hint}`,
+      beach: `Best beaches or outdoor spots around ${where}.${hint}`,
+      activity: `Top-rated things to do in ${where}${when}.${hint}`,
     };
     setLoadingIdeas(true);
     setIdeas(null);
@@ -380,87 +401,141 @@ function AddItemSheet({ open, dayN, dayDate, tripId, dest, prefs, initial, onClo
     }
   };
 
+  const pickIdea = (idea: AiSuggestion) => {
+    setTitle(idea.title + (idea.price ? ` (${idea.price})` : ''));
+    setPlace(idea.area);
+    if (idea.time) setTime(idea.time);
+    setCoords(idea.lat !== undefined && idea.lng !== undefined ? { lat: idea.lat, lng: idea.lng } : undefined);
+    setIdeas(null);
+  };
+
   return (
     <Sheet open={open} onClose={onClose}>
-      <h2 className="sec-title" style={{ marginBottom: 20 }}>{initial ? 'Edit plan' : `Add to Day ${dayN}`}</h2>
-      <label style={{ fontSize: 13, color: 'var(--ink-soft)', display: 'block', marginBottom: 6 }}>What&apos;s the plan?</label>
-      <input className="input" placeholder="e.g. Sunset surf lesson" value={title} autoFocus onChange={(e) => setTitle(e.target.value)} />
+      <div style={{ maxHeight: '68vh', overflowY: 'auto' }}>
+        {step === 'type' ? (
+          <>
+            <h2 className="sec-title" style={{ marginBottom: 4 }}>Add to Day {dayN}</h2>
+            <p className="hdr-sub" style={{ marginBottom: 16 }}>First, what kind of plan is it?</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              {CATS.map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => { setCat(c.id); setStep('detail'); }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '12px 14px', background: 'var(--surface-2)',
+                    borderRadius: 12, textAlign: 'left',
+                  }}
+                >
+                  <div style={{
+                    width: 32, height: 32, borderRadius: 9, flexShrink: 0,
+                    background: CAT_COLORS[c.id]?.bg ?? 'var(--surface)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <Icon name={CAT_ICONS[c.id] ?? 'map-pin'} size={16} color={CAT_COLORS[c.id]?.fg ?? 'var(--ink-soft)'} />
+                  </div>
+                  <span style={{ fontSize: 14, fontWeight: 600 }}>{c.label}</span>
+                </button>
+              ))}
+            </div>
+          </>
+        ) : (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+              {!initial && (
+                <button onClick={() => setStep('type')} aria-label="Back to plan types" style={{ display: 'flex' }}>
+                  <Icon name="arrow-left" size={18} color="var(--ink-soft)" />
+                </button>
+              )}
+              <h2 className="sec-title">{initial ? 'Edit plan' : `Add to Day ${dayN}`}</h2>
+              <button
+                className="chip terra"
+                style={{ marginLeft: 'auto', fontSize: 11.5, gap: 5 }}
+                onClick={() => !initial && setStep('type')}
+              >
+                <Icon name={CAT_ICONS[cat]} size={12} color="var(--terra-ink)" /> {CATS.find((c) => c.id === cat)?.label}
+              </button>
+            </div>
 
-      <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
-        <div style={{ flex: 1.6 }}>
-          <label style={{ fontSize: 13, color: 'var(--ink-soft)', display: 'block', marginBottom: 6 }}>Where <span style={{ color: 'var(--ink-faint)' }}>(optional)</span></label>
-          <input className="input" placeholder="e.g. Selong Belanak" value={place} onChange={(e) => setPlace(e.target.value)} />
-        </div>
-        <div style={{ flex: 1 }}>
-          <label style={{ fontSize: 13, color: 'var(--ink-soft)', display: 'block', marginBottom: 6 }}>Time</label>
-          <input className="input" type="time" value={time} onChange={(e) => setTime(e.target.value)} />
-        </div>
-      </div>
+            <label style={{ fontSize: 13, color: 'var(--ink-soft)', display: 'block', marginBottom: 6 }}>What&apos;s the plan?</label>
+            <input className="input" placeholder="e.g. Sunset surf lesson" value={title} autoFocus onChange={(e) => setTitle(e.target.value)} />
 
-      <label style={{ fontSize: 13, color: 'var(--ink-soft)', display: 'block', margin: '14px 0 6px' }}>Booking link <span style={{ color: 'var(--ink-faint)' }}>(optional)</span></label>
-      <input className="input" type="url" placeholder="https://…" value={url} onChange={(e) => setUrl(e.target.value)} />
+            <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
+              <div style={{ flex: 1.6 }}>
+                <label style={{ fontSize: 13, color: 'var(--ink-soft)', display: 'block', marginBottom: 6 }}>Approx location <span style={{ color: 'var(--ink-faint)' }}>(optional)</span></label>
+                <input className="input" placeholder="e.g. Selong Belanak" value={place} onChange={(e) => setPlace(e.target.value)} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: 13, color: 'var(--ink-soft)', display: 'block', marginBottom: 6 }}>Time</label>
+                <input className="input" type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+              </div>
+            </div>
 
-      <label style={{ fontSize: 13, color: 'var(--ink-soft)', display: 'block', margin: '14px 0 8px' }}>Type</label>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-        {CATS.map((c) => (
-          <button key={c.id} className={`chip${cat === c.id ? ' on' : ''}`} onClick={() => setCat(c.id)}>
-            <Icon name={CAT_ICONS[c.id]} size={12} color={cat === c.id ? 'var(--surface)' : 'var(--ink-soft)'} />
-            {c.label}
-          </button>
-        ))}
-      </div>
+            <label style={{ fontSize: 13, color: 'var(--ink-soft)', display: 'block', margin: '14px 0 6px' }}>Booking link <span style={{ color: 'var(--ink-faint)' }}>(optional)</span></label>
+            <input className="input" type="url" placeholder="https://…" value={url} onChange={(e) => setUrl(e.target.value)} />
 
-      {/* AI assist */}
-      <button
-        className="btn ghost sm"
-        style={{ width: '100%', marginTop: 16, gap: 6 }}
-        disabled={loadingIdeas}
-        onClick={askAi}
-      >
-        <Icon name="sparkles" size={14} color="var(--gold)" />
-        {loadingIdeas ? 'Asking the trip assistant…' : `Suggest ${cat === 'food' ? 'restaurants' : cat === 'travel' ? 'flights & transport' : cat === 'stay' ? 'stays' : 'ideas'} with AI`}
-      </button>
-      {ideas && ideas.length === 0 && (
-        <p style={{ fontSize: 12.5, color: 'var(--ink-faint)', textAlign: 'center', marginTop: 8 }}>
-          No suggestions this time — try asking in Discover.
-        </p>
-      )}
-      {ideas && ideas.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10 }}>
-          {ideas.map((idea, i) => (
+            {/* AI assist */}
             <button
-              key={i}
+              className="btn ghost sm"
+              style={{ width: '100%', marginTop: 16, gap: 6 }}
+              disabled={loadingIdeas}
+              onClick={askAi}
+            >
+              <Icon name="sparkles" size={14} color="var(--gold)" />
+              {loadingIdeas ? 'Asking the trip assistant…' : `Suggest ${cat === 'food' ? 'restaurants' : cat === 'travel' ? 'flights & transport' : cat === 'stay' ? 'stays' : 'ideas'} with AI`}
+            </button>
+            {ideas && ideas.length === 0 && (
+              <p style={{ fontSize: 12.5, color: 'var(--ink-faint)', textAlign: 'center', marginTop: 8 }}>
+                No suggestions this time — try asking in Discover.
+              </p>
+            )}
+            {ideas && ideas.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10 }}>
+                {ideas.map((idea, i) => (
+                  <button
+                    key={i}
+                    onClick={() => pickIdea(idea)}
+                    style={{
+                      textAlign: 'left', padding: '10px 12px', background: 'var(--surface-2)',
+                      borderRadius: 12, border: '1px solid var(--line-2)',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                      <p style={{ fontSize: 13.5, fontWeight: 600 }}>{idea.title}</p>
+                      {idea.price && <p style={{ fontSize: 12.5, fontWeight: 700, flexShrink: 0 }}>{idea.price}</p>}
+                    </div>
+                    <p style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 2 }}>
+                      {[idea.time, idea.area].filter(Boolean).join(' · ')} — {idea.detail}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {coords && (
+              <p style={{ fontSize: 11.5, color: 'var(--ink-faint)', marginTop: 10, display: 'flex', alignItems: 'center', gap: 5 }}>
+                <Icon name="map-pin" size={11} color="var(--ink-faint)" />
+                Pinned at {coords.lat.toFixed(4)}, {coords.lng.toFixed(4)} — shows on the day map
+              </p>
+            )}
+
+            <button
+              className="btn"
+              disabled={!title.trim()}
+              style={{ width: '100%', marginTop: 24 }}
               onClick={() => {
-                setTitle(idea.title + (idea.price ? ` (${idea.price})` : ''));
-                setPlace(idea.area);
-                setIdeas(null);
-              }}
-              style={{
-                textAlign: 'left', padding: '10px 12px', background: 'var(--surface-2)',
-                borderRadius: 12, border: '1px solid var(--line-2)',
+                onAdd({
+                  time: time || undefined, title: title.trim(), place: place.trim() || undefined,
+                  cat, url: url.trim() || undefined, lat: coords?.lat, lng: coords?.lng,
+                });
+                setTitle(''); setPlace(''); setTime(''); setCat('activity'); setUrl(''); setCoords(undefined);
               }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                <p style={{ fontSize: 13.5, fontWeight: 600 }}>{idea.title}</p>
-                {idea.price && <p style={{ fontSize: 12.5, fontWeight: 700, flexShrink: 0 }}>{idea.price}</p>}
-              </div>
-              <p style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 2 }}>{idea.area} — {idea.detail}</p>
+              {initial ? 'Save changes' : 'Add to the plan'}
             </button>
-          ))}
-        </div>
-      )}
-
-      <button
-        className="btn"
-        disabled={!title.trim()}
-        style={{ width: '100%', marginTop: 24 }}
-        onClick={() => {
-          onAdd({ time: time || undefined, title: title.trim(), place: place.trim() || undefined, cat, url: url.trim() || undefined });
-          setTitle(''); setPlace(''); setTime(''); setCat('activity'); setUrl('');
-        }}
-      >
-        {initial ? 'Save changes' : 'Add to the plan'}
-      </button>
+          </>
+        )}
+      </div>
     </Sheet>
   );
 }

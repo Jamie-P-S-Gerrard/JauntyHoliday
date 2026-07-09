@@ -2,6 +2,7 @@
 // AppShell routes to the demo implementations in lib/demo-apis.ts otherwise.
 import { createClient } from './supabase/client';
 import { dateRange, formatDayLabel, formatRange, formatSub } from './dates';
+import { byTime, timeFromHHMM } from './time';
 import type {
   Group, GroupPrefs, TripSummary, TripStatus,
   DateOption, DatesApi, BoardItem, BoardApi,
@@ -296,7 +297,7 @@ export const dbItineraryApi: ItineraryApi = {
     const { data: { user } } = await supabase.auth.getUser();
     const { data, error } = await supabase
       .from('days')
-      .select('id, day_number, date_label, title, area, itinerary_items ( id, time_label, title, place, cat, who, sort_order, url, item_likes ( user_id ) )')
+      .select('id, day_number, date_label, title, area, itinerary_items ( id, start_time, title, place, cat, who, lat, lng, sort_order, url, item_likes ( user_id ) )')
       .eq('trip_id', tripId)
       .order('day_number', { ascending: true });
     if (error) throw error;
@@ -307,20 +308,20 @@ export const dbItineraryApi: ItineraryApi = {
       title: d.title ?? `Day ${d.day_number}`,
       area: d.area ?? '',
       items: (d.itinerary_items ?? [])
-        .sort((a: { sort_order: number | null; time_label: string | null }, b: { sort_order: number | null; time_label: string | null }) =>
-          (a.time_label ?? '99:99').localeCompare(b.time_label ?? '99:99'))
-        .map((i: { id: string; time_label: string | null; title: string; place: string | null; cat: string | null; who: string | null; url: string | null; item_likes: Array<{ user_id: string }> }) => ({
+        .map((i: { id: string; start_time: string | null; title: string; place: string | null; cat: string | null; who: string | null; lat: number | null; lng: number | null; url: string | null; item_likes: Array<{ user_id: string }> }) => ({
           id: i.id,
-          t: i.time_label ?? '–',
+          time: timeFromHHMM(i.start_time),
           title: i.title,
           place: i.place ?? '',
           cat: (i.cat ?? 'activity') as Day['items'][number]['cat'],
           url: i.url ?? undefined,
           who: i.who ?? '',
+          coords: i.lat !== null && i.lng !== null ? { lat: i.lat, lng: i.lng } : undefined,
           likes: (i.item_likes ?? []).length,
           liked: !!user && (i.item_likes ?? []).some((l: { user_id: string }) => l.user_id === user.id),
           comments: 0,
-        })),
+        }))
+        .sort(byTime),
     }));
   },
 
@@ -339,30 +340,34 @@ export const dbItineraryApi: ItineraryApi = {
     if (error) throw error;
   },
 
-  async addItem(dayId, { time, title, place, cat, url }) {
+  async addItem(dayId, { time, title, place, cat, url, lat, lng }) {
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not signed in');
     const { error } = await supabase.from('itinerary_items').insert({
       day_id: dayId,
-      time_label: time || null,
+      start_time: time || null,
       title,
       place: place || null,
       cat,
       url: url || null,
+      lat: lat ?? null,
+      lng: lng ?? null,
       who: user.id,
     });
     if (error) throw error;
   },
 
-  async updateItem(itemId, { time, title, place, cat, url }) {
+  async updateItem(itemId, { time, title, place, cat, url, lat, lng }) {
     const supabase = createClient();
     const { error } = await supabase.from('itinerary_items').update({
-      time_label: time || null,
+      start_time: time || null,
       title,
       place: place || null,
       cat,
       url: url || null,
+      lat: lat ?? null,
+      lng: lng ?? null,
     }).eq('id', itemId);
     if (error) throw error;
   },
