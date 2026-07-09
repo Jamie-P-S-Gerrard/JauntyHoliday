@@ -6,7 +6,8 @@ import { Icon } from '@/components/ui/Icon';
 import { Sheet } from '@/components/ui/Sheet';
 import { Placeholder } from '@/components/ui/Placeholder';
 import { ChatSheet } from '@/components/ui/ChatSheet';
-import type { AppTab, ChatApi, Day, ItineraryApi, Stay, StaysApi, StayStatus } from '@/types';
+import { TripPhotos } from './TripPhotos';
+import type { AppTab, ChatApi, Day, ItineraryApi, PhotosApi, Stay, StaysApi, StayStatus } from '@/types';
 
 const STATUS_META: Record<StayStatus, { label: string; cls: string }> = {
   todo:    { label: 'Idea',    cls: 'gold' },
@@ -29,13 +30,14 @@ interface RealTripHomeProps {
   staysApi: StaysApi;
   itinApi: ItineraryApi;
   chatApi: ChatApi;
+  photosApi: PhotosApi;
   onSwitch: () => void;
   go: (tab: AppTab) => void;
 }
 
 export function RealTripHome({
   groupName, dest, when, tint, members, tripId, groupId, userId,
-  staysApi, itinApi, chatApi, onSwitch, go,
+  staysApi, itinApi, chatApi, photosApi, onSwitch, go,
 }: RealTripHomeProps) {
   const [stays, setStays] = useState<Stay[]>([]);
   const [days, setDays] = useState<Day[]>([]);
@@ -193,6 +195,9 @@ export function RealTripHome({
             <p className="hdr-sub">Set your dates and start filling the days.</p>
           </button>
         )}
+
+        {/* Shared photo gallery — private to the group */}
+        <TripPhotos tripId={tripId} groupId={groupId} userId={userId} api={photosApi} />
 
         <div style={{ height: 90 }} />
       </div>

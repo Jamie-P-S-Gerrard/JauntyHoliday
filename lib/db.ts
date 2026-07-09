@@ -3,17 +3,18 @@
 import { createClient } from './supabase/client';
 import { dateRange, formatDayLabel, formatRange, formatSub } from './dates';
 import { byTime, timeFromHHMM } from './time';
+import { prepareAvatar, prepareImage } from './image';
 import type {
   Group, GroupPrefs, TripSummary, TripStatus,
   DateOption, DatesApi, BoardItem, BoardApi,
   Day, ItineraryApi, Stay, StaysApi, StayStatus,
   GroupEvent, EventsApi, ChatApi, ChatMsg, EventPart, EventInput,
-  ChangeEntry, HistoryApi,
+  ChangeEntry, HistoryApi, PhotosApi, TripPhoto,
 } from '@/types';
 
 const TRIP_TINTS = ['#caa37a', '#7fa0c0', '#9aa56a', '#b07a9a', '#c77f6a', '#7fa39a'];
 
-interface ProfileRow { id: string; name: string; initials: string }
+interface ProfileRow { id: string; name: string; initials: string; avatarUrl?: string | null }
 
 // ── Groups, trips, preferences ────────────────────────────────────────────────
 
@@ -70,12 +71,36 @@ export async function fetchGroups(): Promise<{
   if (memberIds.length > 0) {
     const { data: profileRows } = await supabase
       .from('profiles')
-      .select('id, name, initials')
+      .select('id, name, initials, avatar_url')
       .in('id', memberIds);
-    profiles = profileRows ?? [];
+    profiles = (profileRows ?? []).map((p) => ({
+      id: p.id, name: p.name, initials: p.initials, avatarUrl: p.avatar_url,
+    }));
   }
 
   return { groups, profiles };
+}
+
+// ── Profile avatar ────────────────────────────────────────────────────────────
+
+// Uploads to avatars/{uid}/avatar.webp (storage policy pins users to their own
+// folder) and returns a cache-busted public URL, saved on the profile.
+export async function updateAvatarDb(file: File): Promise<string> {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not signed in');
+
+  const blob = await prepareAvatar(file);
+  const path = `${user.id}/avatar.webp`;
+  const { error: uploadError } = await supabase.storage
+    .from('avatars')
+    .upload(path, blob, { contentType: 'image/webp', upsert: true });
+  if (uploadError) throw uploadError;
+
+  const url = `${supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl}?v=${Date.now()}`;
+  const { error } = await supabase.from('profiles').update({ avatar_url: url }).eq('id', user.id);
+  if (error) throw error;
+  return url;
 }
 
 export async function createGroupDb(name: string, firstTrip?: { dest: string; when: string }): Promise<void> {
@@ -286,6 +311,72 @@ export const dbBoardApi: BoardApi = {
     const supabase = createClient();
     const { error } = await supabase.from('mood_board_items').delete().eq('id', itemId);
     if (error) throw error;
+  },
+};
+
+// ── Trip photos ───────────────────────────────────────────────────────────────
+
+// The trip-photos bucket is PRIVATE: reads go through short-lived signed URLs,
+// and storage policies restrict every operation to the photo's group members.
+export const dbPhotosApi: PhotosApi = {
+  async list(tripId) {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from('trip_photos')
+      .select('id, path, caption, who, created_at')
+      .eq('trip_id', tripId)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    if (!data || data.length === 0) return [];
+
+    const { data: signed, error: signError } = await supabase.storage
+      .from('trip-photos')
+      .createSignedUrls(data.map((p) => p.path), 3600);
+    if (signError) throw signError;
+
+    return data.map((p, i): TripPhoto => ({
+      id: p.id,
+      url: signed?.[i]?.signedUrl ?? '',
+      caption: p.caption ?? undefined,
+      who: p.who ?? '',
+      at: p.created_at,
+    })).filter((p) => p.url);
+  },
+
+  async add(tripId, groupId, file, caption) {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not signed in');
+
+    const blob = await prepareImage(file);
+    const path = `${groupId}/${tripId}/${crypto.randomUUID()}.webp`;
+    const { error: uploadError } = await supabase.storage
+      .from('trip-photos')
+      .upload(path, blob, { contentType: 'image/webp' });
+    if (uploadError) throw uploadError;
+
+    const { error } = await supabase.from('trip_photos').insert({
+      trip_id: tripId,
+      group_id: groupId,
+      path,
+      caption: caption?.trim() || null,
+      who: user.id,
+    });
+    if (error) throw error;
+  },
+
+  async remove(photoId) {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from('trip_photos')
+      .select('path')
+      .eq('id', photoId)
+      .single();
+    if (error) throw error;
+    const { error: deleteError } = await supabase.from('trip_photos').delete().eq('id', photoId);
+    if (deleteError) throw deleteError;
+    // Best-effort: the row is the source of truth, orphaned objects are harmless
+    await supabase.storage.from('trip-photos').remove([data.path]).catch(() => {});
   },
 };
 

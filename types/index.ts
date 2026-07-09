@@ -144,6 +144,23 @@ export interface EventsApi {
   remove(eventId: string): Promise<void>;
 }
 
+// ── Trip photos: shared gallery, private to the group ────────────────────────
+
+export interface TripPhoto {
+  id: string;
+  /** Display URL — short-lived signed URL (Supabase) or object URL (demo). */
+  url: string;
+  caption?: string;
+  who: UserId;
+  at: string;
+}
+
+export interface PhotosApi {
+  list(tripId: string): Promise<TripPhoto[]>;
+  add(tripId: string, groupId: string, file: File, caption?: string): Promise<void>;
+  remove(photoId: string): Promise<void>;
+}
+
 // ── Chat: message threads on a trip or an event ───────────────────────────────
 
 export interface ChatMsg {

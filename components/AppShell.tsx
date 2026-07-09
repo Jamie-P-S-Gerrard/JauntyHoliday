@@ -12,7 +12,7 @@ import { DatesScreen } from './screens/DatesScreen';
 import { DiscoverScreen } from './screens/DiscoverScreen';
 import { PlanScreen } from './screens/PlanScreen';
 import { BudgetScreen } from './screens/BudgetScreen';
-import { INIT_GROUPS, registerProfiles } from '@/lib/data';
+import { INIT_GROUPS, registerProfiles, USER_AVATARS } from '@/lib/data';
 import { createClient } from '@/lib/supabase/client';
 import { supabaseConfigured } from '@/lib/supabase/configured';
 import { RealTripHome } from './screens/RealTripHome';
@@ -20,9 +20,11 @@ import {
   fetchGroups, createGroupDb, joinGroupDb, createTripDb,
   markTripReadyDb, updateTripDb, savePrefsDb, dbDatesApi, dbBoardApi,
   dbItineraryApi, dbStaysApi, dbEventsApi, dbChatApi, dbHistoryApi,
+  dbPhotosApi, updateAvatarDb,
 } from '@/lib/db';
 import {
   demoDatesApi, demoBoardApi, demoItineraryApi, demoStaysApi, demoEventsApi, demoChatApi, demoHistoryApi,
+  demoPhotosApi, updateAvatarDemo,
 } from '@/lib/demo-apis';
 import type { AppStage, AppTab, Group, GroupPrefs, TripSummary } from '@/types';
 
@@ -46,6 +48,7 @@ export function AppShell() {
   const eventsApi = configured ? dbEventsApi : demoEventsApi;
   const chatApi = configured ? dbChatApi : demoChatApi;
   const historyApi = configured ? dbHistoryApi : demoHistoryApi;
+  const photosApi = configured ? dbPhotosApi : demoPhotosApi;
 
   const activeGroup = groups.find((g) => g.id === activeGroupId) ?? null;
   const activeTrip = activeGroup?.trips.find((t) => t.id === activeTripId) ?? null;
@@ -103,6 +106,15 @@ export function AppShell() {
     });
     return () => subscription.unsubscribe();
   }, [configured, loadData]);
+
+  // Force a re-render after the avatar registry changes so every Avatar
+  // instance picks up the new photo without a data reload.
+  const [, setAvatarVersion] = useState(0);
+  const changeAvatar = async (file: File) => {
+    const url = configured ? await updateAvatarDb(file) : await updateAvatarDemo(file);
+    USER_AVATARS[userId] = url;
+    setAvatarVersion((v) => v + 1);
+  };
 
   const signOut = async () => {
     if (configured) {
@@ -280,6 +292,7 @@ export function AppShell() {
                 onCreate={createGroup}
                 onJoin={joinGroup}
                 onSignOut={signOut}
+                onChangeAvatar={changeAvatar}
               />
             )
           )}
@@ -332,6 +345,7 @@ export function AppShell() {
                     staysApi={staysApi}
                     itinApi={itinApi}
                     chatApi={chatApi}
+                    photosApi={photosApi}
                     onSwitch={() => setStage('group')}
                     go={setTab}
                   />

@@ -1,6 +1,6 @@
 'use client';
 import type { CSSProperties } from 'react';
-import { USER_INITIALS } from '@/lib/data';
+import { USER_AVATARS, USER_INITIALS } from '@/lib/data';
 
 type AvatarSize = 'sm' | 'md' | 'lg';
 
@@ -36,6 +36,20 @@ export function Avatar({ userId, size = 'md', className = '', style }: AvatarPro
   const { px, fs, fw } = SIZE[size];
   const initial = USER_INITIALS[userId] ?? userId[0]?.toUpperCase() ?? '?';
   const known = KNOWN_AV.has(userId);
+  const photo = USER_AVATARS[userId];
+
+  if (photo) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element -- avatar URLs are dynamic (signed/object URLs)
+      <img
+        src={photo}
+        alt={initial}
+        className={`av ${className}`}
+        style={{ width: px, height: px, objectFit: 'cover', ...style }}
+      />
+    );
+  }
+
   return (
     <div
       className={`av${known ? ` av-${userId}` : ''} ${className}`}

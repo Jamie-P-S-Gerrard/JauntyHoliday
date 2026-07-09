@@ -1,5 +1,6 @@
 'use client';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { toast } from '@/components/ui/Toast';
 import { Wordmark } from '@/components/ui/Wordmark';
 import { Avatar, AvatarStack } from '@/components/ui/Avatar';
 import { Sheet } from '@/components/ui/Sheet';
@@ -16,21 +17,73 @@ interface GroupsScreenProps {
   onCreate: (g: Group) => void;
   onJoin: (code: string) => Promise<string | null>;
   onSignOut: () => void;
+  onChangeAvatar: (file: File) => Promise<void>;
 }
 
-export function GroupsScreen({ groups, userId, userName, onOpen, onCreate, onJoin, onSignOut }: GroupsScreenProps) {
+export function GroupsScreen({ groups, userId, userName, onOpen, onCreate, onJoin, onSignOut, onChangeAvatar }: GroupsScreenProps) {
   const [createOpen, setCreateOpen] = useState(false);
   const [joinOpen, setJoinOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [avatarBusy, setAvatarBusy] = useState(false);
+  const avatarFileRef = useRef<HTMLInputElement>(null);
+
+  const changeAvatar = async (file: File) => {
+    setAvatarBusy(true);
+    try {
+      await onChangeAvatar(file);
+      toast('Profile photo updated');
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Couldn't update your photo");
+    } finally {
+      setAvatarBusy(false);
+    }
+  };
 
   return (
     <div className="screen">
       {/* Top bar */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px var(--pad)', flexShrink: 0 }}>
         <Wordmark size={22} />
-        <button onClick={onSignOut}>
+        <button onClick={() => setProfileOpen(true)} aria-label="Your profile">
           <Avatar userId={userId} size="lg" />
         </button>
       </div>
+
+      {/* Profile sheet */}
+      <input
+        ref={avatarFileRef}
+        type="file"
+        accept="image/*"
+        style={{ display: 'none' }}
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) changeAvatar(f);
+          e.target.value = '';
+        }}
+      />
+      <Sheet open={profileOpen} onClose={() => setProfileOpen(false)}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, marginBottom: 18 }}>
+          <Avatar userId={userId} size="lg" style={{ width: 72, height: 72, fontSize: 26 }} />
+          <p style={{ fontSize: 16, fontWeight: 600, marginTop: 6 }}>{userName ?? USER_NAMES[userId] ?? 'You'}</p>
+        </div>
+        <button
+          className="btn ghost"
+          disabled={avatarBusy}
+          style={{ width: '100%', gap: 8 }}
+          onClick={() => avatarFileRef.current?.click()}
+        >
+          <Icon name="camera" size={16} color="var(--ink)" />
+          {avatarBusy ? 'Uploading…' : 'Change photo'}
+        </button>
+        <button
+          className="btn ghost"
+          style={{ width: '100%', gap: 8, marginTop: 10 }}
+          onClick={() => { setProfileOpen(false); onSignOut(); }}
+        >
+          <Icon name="arrow-left" size={16} color="var(--ink)" />
+          Sign out
+        </button>
+      </Sheet>
 
       {/* Greeting */}
       <div style={{ padding: '4px var(--pad) 20px' }}>

@@ -3,7 +3,7 @@
 import { dateRange, formatDayLabel, formatRange, formatSub } from './dates';
 import { byTime, timeFromHHMM } from './time';
 import { DAYS } from './data';
-import type { BoardApi, BoardItem, ChangeEntry, ChatApi, ChatMsg, ChatScope, DateOption, DatesApi, Day, EventsApi, GroupEvent, HistoryApi, ItineraryApi, Stay, StaysApi } from '@/types';
+import type { BoardApi, BoardItem, ChangeEntry, ChatApi, ChatMsg, ChatScope, DateOption, DatesApi, Day, EventsApi, GroupEvent, HistoryApi, ItineraryApi, PhotosApi, Stay, StaysApi, TripPhoto } from '@/types';
 
 const DEMO_USER = 'j';
 
@@ -100,6 +100,40 @@ export const demoBoardApi: BoardApi = {
     }
   },
 };
+
+// ── Trip photos (demo) ────────────────────────────────────────────────────────
+
+const photoStore: Record<string, TripPhoto[]> = {};
+
+export const demoPhotosApi: PhotosApi = {
+  async list(tripId) {
+    await wait();
+    return [...(photoStore[tripId] ?? [])];
+  },
+  async add(tripId, _groupId, file, caption) {
+    await wait();
+    if (!file.type.startsWith('image/')) throw new Error('Choose an image file');
+    (photoStore[tripId] ??= []).unshift({
+      id: `ph${Date.now()}`,
+      url: URL.createObjectURL(file),
+      caption: caption?.trim() || undefined,
+      who: DEMO_USER,
+      at: new Date().toISOString(),
+    });
+  },
+  async remove(photoId) {
+    await wait();
+    for (const key of Object.keys(photoStore)) {
+      photoStore[key] = photoStore[key].filter((p) => p.id !== photoId);
+    }
+  },
+};
+
+export async function updateAvatarDemo(file: File): Promise<string> {
+  await wait();
+  if (!file.type.startsWith('image/')) throw new Error('Choose an image file');
+  return URL.createObjectURL(file);
+}
 
 // ── Itinerary (demo) ──────────────────────────────────────────────────────────
 

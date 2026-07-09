@@ -205,11 +205,15 @@ export const USER_INITIALS: Record<string, string> = {
   c: 'C', j: 'J', m: 'M', r: 'R', f: 'F', s: 'S', ai: '✦',
 };
 
+// Uploaded profile photos, keyed by user id (empty for initials-only users)
+export const USER_AVATARS: Record<string, string> = {};
+
 // Real signed-in users get merged in after fetching profiles from Supabase,
 // so every screen's name/initial lookups keep working with UUID user ids.
-export function registerProfiles(profiles: Array<{ id: string; name: string; initials: string }>) {
+export function registerProfiles(profiles: Array<{ id: string; name: string; initials: string; avatarUrl?: string | null }>) {
   for (const p of profiles) {
     USER_NAMES[p.id] = p.name;
     USER_INITIALS[p.id] = p.initials;
+    if (p.avatarUrl) USER_AVATARS[p.id] = p.avatarUrl;
   }
 }
