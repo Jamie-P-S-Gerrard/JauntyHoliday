@@ -390,7 +390,7 @@ export const dbDocsApi: DocsApi = {
     const supabase = createClient();
     const { data, error } = await supabase
       .from('trip_documents')
-      .select('id, name, path, mime, member_ids, stay_id, uploaded_by, created_at')
+      .select('id, name, path, mime, member_ids, item_id, uploaded_by, created_at')
       .eq('trip_id', tripId)
       .order('created_at', { ascending: false });
     if (error) throw error;
@@ -407,13 +407,13 @@ export const dbDocsApi: DocsApi = {
       url: signed?.[i]?.signedUrl ?? '',
       mime: d.mime ?? undefined,
       memberIds: d.member_ids ?? [],
-      stayId: d.stay_id ?? undefined,
+      itemId: d.item_id ?? undefined,
       who: d.uploaded_by ?? '',
       at: d.created_at,
     })).filter((d) => d.url);
   },
 
-  async add(tripId, groupId, file, { name, memberIds, stayId }) {
+  async add(tripId, groupId, file, { name, memberIds, itemId }) {
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not signed in');
@@ -439,7 +439,7 @@ export const dbDocsApi: DocsApi = {
       mime: isPdf ? 'application/pdf' : 'image/webp',
       size_bytes: blob.size,
       member_ids: memberIds,
-      stay_id: stayId ?? null,
+      item_id: itemId ?? null,
       uploaded_by: user.id,
     });
     if (error) throw error;
@@ -467,7 +467,7 @@ export const dbItineraryApi: ItineraryApi = {
     const { data: { user } } = await supabase.auth.getUser();
     const { data, error } = await supabase
       .from('days')
-      .select('id, day_number, date_label, title, area, itinerary_items ( id, start_time, title, place, cat, who, lat, lng, sort_order, url, item_likes ( user_id ) )')
+      .select('id, day_number, date_label, date, title, area, itinerary_items ( id, start_time, end_date, title, place, cat, who, lat, lng, sort_order, url, item_likes ( user_id ) )')
       .eq('trip_id', tripId)
       .order('day_number', { ascending: true });
     if (error) throw error;
@@ -475,10 +475,11 @@ export const dbItineraryApi: ItineraryApi = {
       id: d.id,
       n: d.day_number,
       date: d.date_label ?? '',
+      iso: d.date ?? undefined,
       title: d.title ?? `Day ${d.day_number}`,
       area: d.area ?? '',
       items: (d.itinerary_items ?? [])
-        .map((i: { id: string; start_time: string | null; title: string; place: string | null; cat: string | null; who: string | null; lat: number | null; lng: number | null; url: string | null; item_likes: Array<{ user_id: string }> }) => ({
+        .map((i: { id: string; start_time: string | null; end_date: string | null; title: string; place: string | null; cat: string | null; who: string | null; lat: number | null; lng: number | null; url: string | null; item_likes: Array<{ user_id: string }> }) => ({
           id: i.id,
           time: timeFromHHMM(i.start_time),
           title: i.title,
@@ -487,6 +488,7 @@ export const dbItineraryApi: ItineraryApi = {
           url: i.url ?? undefined,
           who: i.who ?? '',
           coords: i.lat !== null && i.lng !== null ? { lat: i.lat, lng: i.lng } : undefined,
+          endDate: i.end_date ?? undefined,
           likes: (i.item_likes ?? []).length,
           liked: !!user && (i.item_likes ?? []).some((l: { user_id: string }) => l.user_id === user.id),
           comments: 0,
@@ -504,19 +506,21 @@ export const dbItineraryApi: ItineraryApi = {
       group_id: groupId,
       day_number: i + 1,
       date_label: formatDayLabel(iso),
+      date: iso,
       title: i === 0 ? 'Arrival day' : i === dates.length - 1 ? 'Heading home' : null,
     }));
     const { error } = await supabase.from('days').insert(rows);
     if (error) throw error;
   },
 
-  async addItem(dayId, { time, title, place, cat, url, lat, lng }) {
+  async addItem(dayId, { time, title, place, cat, url, lat, lng, endDate }) {
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not signed in');
     const { error } = await supabase.from('itinerary_items').insert({
       day_id: dayId,
       start_time: time || null,
+      end_date: endDate || null,
       title,
       place: place || null,
       cat,
@@ -528,10 +532,11 @@ export const dbItineraryApi: ItineraryApi = {
     if (error) throw error;
   },
 
-  async updateItem(itemId, { time, title, place, cat, url, lat, lng }) {
+  async updateItem(itemId, { time, title, place, cat, url, lat, lng, endDate }) {
     const supabase = createClient();
     const { error } = await supabase.from('itinerary_items').update({
       start_time: time || null,
+      end_date: endDate || null,
       title,
       place: place || null,
       cat,

@@ -1,13 +1,17 @@
 'use client';
 import { toast } from '@/components/ui/Toast';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { Avatar } from '@/components/ui/Avatar';
 import { Icon } from '@/components/ui/Icon';
 import { Sheet } from '@/components/ui/Sheet';
 import { Placeholder } from '@/components/ui/Placeholder';
+import { DocRow, DocUploadSheet } from './TripDocuments';
 import { formatItemTime, timeToHHMM } from '@/lib/time';
-import type { AiSuggestion, DatesApi, Day, GroupPrefs, ItineraryApi, ItineraryItemCat, ItineraryItemInput, LatLng } from '@/types';
+import type {
+  AiSuggestion, DatesApi, Day, DocsApi, GroupPrefs, ItineraryApi,
+  ItineraryItemCat, ItineraryItemInput, LatLng, TripDoc,
+} from '@/types';
 
 // Leaflet touches `window`, so the map only renders on the client.
 const ItineraryMap = dynamic(() => import('@/components/ui/ItineraryMap'), {
@@ -41,24 +45,33 @@ interface ItineraryProps {
   userId: string;
   api: ItineraryApi;
   datesApi: DatesApi;
+  docsApi: DocsApi;
   members: string[];
   dest?: string;
   prefs?: GroupPrefs;
 }
 
-export function Itinerary({ tripId, groupId, userId, api, datesApi, members, dest, prefs }: ItineraryProps) {
+export function Itinerary({ tripId, groupId, userId, api, datesApi, docsApi, members, dest, prefs }: ItineraryProps) {
   const [days, setDays] = useState<Day[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDay, setSelectedDay] = useState(1);
   const [addOpen, setAddOpen] = useState(false);
-  const [editItem, setEditItem] = useState<{ id: string; time?: string; title: string; place?: string; cat: ItineraryItemCat; url?: string; coords?: LatLng } | null>(null);
+  const [editItem, setEditItem] = useState<{ id: string; time?: string; title: string; place?: string; cat: ItineraryItemCat; url?: string; coords?: LatLng; endDate?: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [prefill, setPrefill] = useState<{ start?: string; end?: string }>({});
+
+  // Booking confirmations, grouped under their activity cards
+  const [docs, setDocs] = useState<TripDoc[]>([]);
+  const [attachItem, setAttachItem] = useState<{ id: string; title: string } | null>(null);
+  const [pendingDoc, setPendingDoc] = useState<File | null>(null);
+  const [docBusy, setDocBusy] = useState(false);
+  const docFileRef = useRef<HTMLInputElement>(null);
 
   const reload = useCallback(async () => {
     try {
       const list = await api.listDays(tripId);
       setDays(list);
+      docsApi.list(tripId).then(setDocs).catch(console.error);
       if (list.length === 0) {
         // Prefill the day-builder from the crew's confirmed (or leading) dates
         try {
@@ -79,7 +92,7 @@ export function Itinerary({ tripId, groupId, userId, api, datesApi, members, des
     } finally {
       setLoading(false);
     }
-  }, [api, datesApi, members, tripId]);
+  }, [api, datesApi, docsApi, members, tripId]);
 
   useEffect(() => { reload(); }, [reload]);
 
@@ -100,12 +113,50 @@ export function Itinerary({ tripId, groupId, userId, api, datesApi, members, des
     return <p className="hdr-sub" style={{ textAlign: 'center', padding: 32 }}>Loading…</p>;
   }
 
+  const saveDoc = async (input: { name: string; memberIds: string[] }) => {
+    if (!pendingDoc || docBusy) return;
+    setDocBusy(true);
+    try {
+      await docsApi.add(tripId, groupId, pendingDoc, { ...input, itemId: attachItem?.id });
+      setPendingDoc(null);
+      setAttachItem(null);
+      setDocs(await docsApi.list(tripId));
+      toast('Confirmation saved');
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Couldn't upload that file");
+    } finally {
+      setDocBusy(false);
+    }
+  };
+
+  const removeDoc = async (docId: string) => {
+    try {
+      await docsApi.remove(docId);
+      setDocs(await docsApi.list(tripId));
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Couldn't delete the document");
+    }
+  };
+
   // No days yet — set up the day-by-day plan from a date range
   if (days.length === 0) {
     return <SetupDays initialStart={prefill.start} initialEnd={prefill.end} onSetup={(start, end) => run(() => api.setupDays(tripId, groupId, start, end))} />;
   }
 
   const day = days.find((d) => d.n === selectedDay) ?? days[0];
+
+  // Ranged items (stay check-out, flight return) land back on the calendar:
+  // an item whose end_date matches this day shows as a closing entry, and
+  // stays spanning this day show as a "staying" chip.
+  const allItems = days.flatMap((d) => d.items.map((item) => ({ item, dayIso: d.iso })));
+  const closingToday = day.iso
+    ? allItems.filter(({ item }) => item.endDate === day.iso && (item.cat === 'stay' || item.cat === 'travel'))
+    : [];
+  const stayingToday = day.iso
+    ? allItems.filter(({ item, dayIso }) =>
+        item.cat === 'stay' && item.endDate && dayIso &&
+        dayIso < day.iso! && day.iso! < item.endDate)
+    : [];
 
   return (
     <>
@@ -143,11 +194,18 @@ export function Itinerary({ tripId, groupId, userId, api, datesApi, members, des
         <div style={{ marginBottom: 12 }}>
           <p className="eyebrow">{day.date || `Day ${day.n}`}</p>
           <p className="sec-title">{day.title}</p>
-          {day.area && (
-            <span className="chip" style={{ marginTop: 6, height: 26, fontSize: 11.5 }}>
-              <Icon name="map-pin" size={11} color="var(--ink-soft)" /> {day.area}
-            </span>
-          )}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+            {day.area && (
+              <span className="chip" style={{ height: 26, fontSize: 11.5 }}>
+                <Icon name="map-pin" size={11} color="var(--ink-soft)" /> {day.area}
+              </span>
+            )}
+            {stayingToday.map(({ item }) => (
+              <span key={item.id} className="chip olive" style={{ height: 26, fontSize: 11.5 }}>
+                <Icon name="bed" size={11} color="var(--olive-ink)" /> {item.title}
+              </span>
+            ))}
+          </div>
         </div>
 
         {/* Map — real pins (numbered in time order) once items carry coordinates */}
@@ -171,11 +229,13 @@ export function Itinerary({ tripId, groupId, userId, api, datesApi, members, des
         )}
 
         {/* Timeline */}
-        {day.items.length > 0 ? (
+        {day.items.length > 0 || closingToday.length > 0 ? (
           <div style={{ position: 'relative', paddingLeft: 48 }}>
             <div style={{ position: 'absolute', left: 20, top: 20, bottom: 20, width: 1.5, background: 'var(--line-2)' }} />
 
-            {day.items.map((item) => (
+            {day.items.map((item) => {
+              const itemDocs = docs.filter((d) => d.itemId === item.id);
+              return (
               <div key={item.id} style={{ position: 'relative', marginBottom: 12 }}>
                 <div style={{ position: 'absolute', left: -48, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, paddingTop: 14 }}>
                   <p style={{ fontSize: 10, color: 'var(--ink-faint)', fontWeight: 600, whiteSpace: 'nowrap' }}>{formatItemTime(item)}</p>
@@ -193,6 +253,14 @@ export function Itinerary({ tripId, groupId, userId, api, datesApi, members, des
                     <p style={{ fontSize: 14.5, fontWeight: 600 }}>{item.title}</p>
                     <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
                       <button
+                        onClick={() => { setAttachItem({ id: item.id, title: item.title }); docFileRef.current?.click(); }}
+                        aria-label={'Attach confirmation to ' + item.title}
+                        title="Attach a booking confirmation"
+                        style={{ opacity: 0.5, padding: 2 }}
+                      >
+                        <Icon name="paperclip" size={13} color="var(--ink-soft)" />
+                      </button>
+                      <button
                         onClick={() => setEditItem({
                           id: item.id,
                           time: item.time !== null ? timeToHHMM(item.time) : undefined,
@@ -201,6 +269,7 @@ export function Itinerary({ tripId, groupId, userId, api, datesApi, members, des
                           cat: item.cat,
                           url: item.url,
                           coords: item.coords,
+                          endDate: item.endDate,
                         })}
                         aria-label="Edit plan"
                         style={{ opacity: 0.5, padding: 2 }}
@@ -225,6 +294,12 @@ export function Itinerary({ tripId, groupId, userId, api, datesApi, members, des
                         <p style={{ fontSize: 12.5, color: 'var(--ink-soft)' }}>{item.place}</p>
                       </>
                     )}
+                    {item.endDate && (
+                      <span className="chip" style={{ height: 22, fontSize: 10.5 }}>
+                        <Icon name="calendar" size={10} color="var(--ink-soft)" />
+                        {item.cat === 'stay' ? 'until ' : 'returns '}{formatShortDate(item.endDate)}
+                      </span>
+                    )}
                     {item.url && (
                       <a
                         className="chip terra"
@@ -240,6 +315,13 @@ export function Itinerary({ tripId, groupId, userId, api, datesApi, members, des
                       <Avatar userId={item.who} size="sm" />
                     </div>
                   </div>
+                  {itemDocs.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--line-2)' }}>
+                      {itemDocs.map((doc) => (
+                        <DocRow key={doc.id} doc={doc} canDelete={doc.who === userId} onDelete={() => removeDoc(doc.id)} />
+                      ))}
+                    </div>
+                  )}
                   <div style={{ display: 'flex', gap: 12, marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--line-2)' }}>
                     <button
                       onClick={() => run(() => api.toggleLike(item.id, item.liked))}
@@ -249,6 +331,38 @@ export function Itinerary({ tripId, groupId, userId, api, datesApi, members, des
                       {item.likes > 0 ? item.likes : ''}
                     </button>
                   </div>
+                </div>
+              </div>
+              );
+            })}
+
+            {/* Check-outs and returns landing on this day */}
+            {closingToday.map(({ item }) => (
+              <div key={`end-${item.id}`} style={{ position: 'relative', marginBottom: 12 }}>
+                <div style={{ position: 'absolute', left: -48, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, paddingTop: 14 }}>
+                  <p style={{ fontSize: 10, color: 'var(--ink-faint)', fontWeight: 600 }}>–</p>
+                  <div style={{
+                    width: 28, height: 28, borderRadius: 8,
+                    background: CAT_COLORS[item.cat]?.bg ?? 'var(--surface-2)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <Icon name={CAT_ICONS[item.cat] ?? 'map-pin'} size={14} color={CAT_COLORS[item.cat]?.fg ?? 'var(--ink-soft)'} />
+                  </div>
+                </div>
+                <div className="card" style={{ padding: '12px var(--cardpad)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span className={`chip ${item.cat === 'stay' ? 'olive' : 'terra'}`} style={{ height: 22, fontSize: 10.5 }}>
+                      {item.cat === 'stay' ? 'Check-out' : 'Return'}
+                    </span>
+                    <p style={{ fontSize: 14.5, fontWeight: 600, flex: 1, minWidth: 0 }}>{item.title}</p>
+                    <Avatar userId={item.who} size="sm" />
+                  </div>
+                  {item.place && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                      <Icon name="map-pin" size={11} color="var(--ink-faint)" />
+                      <p style={{ fontSize: 12.5, color: 'var(--ink-soft)' }}>{item.place}</p>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
@@ -279,20 +393,60 @@ export function Itinerary({ tripId, groupId, userId, api, datesApi, members, des
         open={addOpen || !!editItem}
         dayN={day.n}
         dayDate={day.date}
+        dayIso={day.iso}
         tripId={tripId}
         dest={dest}
         prefs={prefs}
         initial={editItem}
         onClose={() => { setAddOpen(false); setEditItem(null); }}
-        onAdd={(input) => {
+        onAdd={(input, startDate) => {
           const editingId = editItem?.id;
           setAddOpen(false);
           setEditItem(null);
-          run(() => (editingId ? api.updateItem(editingId, input) : api.addItem(day.id, input)));
+          // A check-in/departure date places the plan on that calendar day
+          let targetDay = day;
+          if (!editingId && startDate) {
+            const match = days.find((d) => d.iso === startDate);
+            if (match) {
+              targetDay = match;
+              if (match.n !== day.n) {
+                setSelectedDay(match.n);
+                toast(`Added to Day ${match.n} · ${match.date}`);
+              }
+            } else {
+              toast(`${formatShortDate(startDate)} isn't in the trip days — added to Day ${day.n}`);
+            }
+          }
+          run(() => (editingId ? api.updateItem(editingId, input) : api.addItem(targetDay.id, input)));
         }}
+      />
+
+      {/* Booking confirmation upload (paperclip on a plan card) */}
+      <input
+        ref={docFileRef}
+        type="file"
+        accept="application/pdf,image/*"
+        style={{ display: 'none' }}
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) setPendingDoc(f);
+          e.target.value = '';
+        }}
+      />
+      <DocUploadSheet
+        file={pendingDoc}
+        members={members}
+        itemTitle={attachItem?.title}
+        busy={docBusy}
+        onSave={saveDoc}
+        onClose={() => { setPendingDoc(null); setAttachItem(null); }}
       />
     </>
   );
+}
+
+function formatShortDate(iso: string): string {
+  return new Date(`${iso}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 function SetupDays({ initialStart, initialEnd, onSetup }: {
@@ -341,12 +495,12 @@ function SetupDays({ initialStart, initialEnd, onSetup }: {
   );
 }
 
-function AddItemSheet({ open, dayN, dayDate, tripId, dest, prefs, initial, onClose, onAdd }: {
-  open: boolean; dayN: number; dayDate?: string; tripId: string;
+function AddItemSheet({ open, dayN, dayDate, dayIso, tripId, dest, prefs, initial, onClose, onAdd }: {
+  open: boolean; dayN: number; dayDate?: string; dayIso?: string; tripId: string;
   dest?: string; prefs?: GroupPrefs;
-  initial?: { id: string; time?: string; title: string; place?: string; cat: ItineraryItemCat; url?: string; coords?: LatLng } | null;
+  initial?: { id: string; time?: string; title: string; place?: string; cat: ItineraryItemCat; url?: string; coords?: LatLng; endDate?: string } | null;
   onClose: () => void;
-  onAdd: (input: ItineraryItemInput) => void;
+  onAdd: (input: ItineraryItemInput, startDate?: string) => void;
 }) {
   // Type is chosen first; the detail step follows (edits jump straight there).
   const [step, setStep] = useState<'type' | 'detail'>('type');
@@ -356,6 +510,8 @@ function AddItemSheet({ open, dayN, dayDate, tripId, dest, prefs, initial, onClo
   const [time, setTime] = useState('');
   const [url, setUrl] = useState('');
   const [coords, setCoords] = useState<LatLng | undefined>(undefined);
+  const [startDate, setStartDate] = useState(''); // check-in / departure
+  const [endDate, setEndDate] = useState('');     // check-out / return
   const [ideas, setIdeas] = useState<AiSuggestion[] | null>(null);
   const [loadingIdeas, setLoadingIdeas] = useState(false);
 
@@ -369,8 +525,15 @@ function AddItemSheet({ open, dayN, dayDate, tripId, dest, prefs, initial, onClo
     setCat(initial?.cat ?? 'activity');
     setUrl(initial?.url ?? '');
     setCoords(initial?.coords);
+    setStartDate(dayIso ?? '');
+    setEndDate(initial?.endDate ?? '');
     setIdeas(null);
-  }, [open, initial]);
+  }, [open, initial, dayIso]);
+
+  const ranged = cat === 'stay' || cat === 'travel';
+  const dateLabels = cat === 'stay'
+    ? { start: 'Check-in', end: 'Check-out' }
+    : { start: 'Departure', end: 'Return (optional)' };
 
   const askAi = async () => {
     const where = [place.trim(), dest].filter(Boolean).join(', ') || 'our destination';
@@ -471,6 +634,37 @@ function AddItemSheet({ open, dayN, dayDate, tripId, dest, prefs, initial, onClo
               </div>
             </div>
 
+            {/* Stays get check-in/check-out; flights get departure/return.
+                The dates place the plan on the matching calendar days. */}
+            {ranged && (
+              <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: 13, color: 'var(--ink-soft)', display: 'block', marginBottom: 6 }}>{dateLabels.start}</label>
+                  <input
+                    className="input"
+                    type="date"
+                    value={startDate}
+                    disabled={!!initial}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setStartDate(v);
+                      if (v && endDate && endDate < v) setEndDate(v);
+                    }}
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: 13, color: 'var(--ink-soft)', display: 'block', marginBottom: 6 }}>{dateLabels.end}</label>
+                  <input
+                    className="input"
+                    type="date"
+                    value={endDate}
+                    min={startDate || undefined}
+                    onChange={(e) => setEndDate(e.target.value)}
+                  />
+                </div>
+              </div>
+            )}
+
             <label style={{ fontSize: 13, color: 'var(--ink-soft)', display: 'block', margin: '14px 0 6px' }}>Booking link <span style={{ color: 'var(--ink-faint)' }}>(optional)</span></label>
             <input className="input" type="url" placeholder="https://…" value={url} onChange={(e) => setUrl(e.target.value)} />
 
@@ -524,11 +718,16 @@ function AddItemSheet({ open, dayN, dayDate, tripId, dest, prefs, initial, onClo
               disabled={!title.trim()}
               style={{ width: '100%', marginTop: 24 }}
               onClick={() => {
-                onAdd({
-                  time: time || undefined, title: title.trim(), place: place.trim() || undefined,
-                  cat, url: url.trim() || undefined, lat: coords?.lat, lng: coords?.lng,
-                });
-                setTitle(''); setPlace(''); setTime(''); setCat('activity'); setUrl(''); setCoords(undefined);
+                onAdd(
+                  {
+                    time: time || undefined, title: title.trim(), place: place.trim() || undefined,
+                    cat, url: url.trim() || undefined, lat: coords?.lat, lng: coords?.lng,
+                    endDate: ranged && endDate ? endDate : undefined,
+                  },
+                  ranged && startDate ? startDate : undefined,
+                );
+                setTitle(''); setPlace(''); setTime(''); setCat('activity'); setUrl('');
+                setCoords(undefined); setStartDate(''); setEndDate('');
               }}
             >
               {initial ? 'Save changes' : 'Add to the plan'}

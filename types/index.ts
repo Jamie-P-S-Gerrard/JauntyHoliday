@@ -171,7 +171,8 @@ export interface TripDoc {
   mime?: string;
   /** Who the booking covers; empty array = the whole group. */
   memberIds: UserId[];
-  stayId?: string;
+  /** The plan item (activity card) this confirmation is attached to. */
+  itemId?: string;
   who: UserId;
   at: string;
 }
@@ -179,7 +180,7 @@ export interface TripDoc {
 export interface DocInput {
   name: string;
   memberIds: UserId[];
-  stayId?: string;
+  itemId?: string;
 }
 
 export interface DocsApi {
@@ -274,6 +275,8 @@ export interface ItineraryItem {
   cat: ItineraryItemCat;
   who: UserId;
   coords?: LatLng;
+  /** ISO date the range ends: check-out for stays, return for flights. */
+  endDate?: string;
   likes: number;
   liked: boolean;
   comments: number;
@@ -282,7 +285,10 @@ export interface ItineraryItem {
 export interface Day {
   id: string;
   n: number;
+  /** Display label, e.g. "Oct 3". */
   date: string;
+  /** Real calendar date, ISO yyyy-mm-dd (missing on older data). */
+  iso?: string;
   title: string;
   area: string;
   items: ItineraryItem[];
@@ -297,6 +303,8 @@ export interface ItineraryItemInput {
   url?: string;
   lat?: number;
   lng?: number;
+  /** ISO date: check-out (stay) or return (travel). */
+  endDate?: string;
 }
 
 export interface ItineraryApi {

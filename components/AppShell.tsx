@@ -347,7 +347,6 @@ export function AppShell() {
                     itinApi={itinApi}
                     chatApi={chatApi}
                     photosApi={photosApi}
-                    docsApi={docsApi}
                     onSwitch={() => setStage('group')}
                     go={setTab}
                   />
@@ -383,6 +382,7 @@ export function AppShell() {
                   boardApi={boardApi}
                   itinApi={itinApi}
                   datesApi={datesApi}
+                  docsApi={docsApi}
                   members={activeGroup.members}
                   dest={activeTrip.dest || undefined}
                   prefs={activeGroup.prefs}

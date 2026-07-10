@@ -138,7 +138,7 @@ export const demoDocsApi: DocsApi = {
     await wait();
     return [...(docStore[tripId] ?? [])];
   },
-  async add(tripId, _groupId, file, { name, memberIds, stayId }) {
+  async add(tripId, _groupId, file, { name, memberIds, itemId }) {
     await wait();
     const isPdf = file.type === 'application/pdf';
     if (!isPdf && !file.type.startsWith('image/')) throw new Error('Choose a PDF or an image');
@@ -148,7 +148,7 @@ export const demoDocsApi: DocsApi = {
       url: URL.createObjectURL(file),
       mime: file.type,
       memberIds,
-      stayId,
+      itemId,
       who: DEMO_USER,
       at: new Date().toISOString(),
     });
@@ -185,12 +185,13 @@ export const demoItineraryApi: ItineraryApi = {
       id: `day-${tripId}-${i + 1}`,
       n: i + 1,
       date: formatDayLabel(iso),
+      iso,
       title: i === 0 ? 'Arrival day' : i === dates.length - 1 ? 'Heading home' : `Day ${i + 1}`,
       area: '',
       items: [],
     }));
   },
-  async addItem(dayId, { time, title, place, cat, url, lat, lng }) {
+  async addItem(dayId, { time, title, place, cat, url, lat, lng, endDate }) {
     await wait();
     for (const days of Object.values(dayStore)) {
       const day = days.find((d) => d.id === dayId);
@@ -199,13 +200,14 @@ export const demoItineraryApi: ItineraryApi = {
           id: `i${Date.now()}`, time: timeFromHHMM(time), title, place: place ?? '', url,
           cat, who: DEMO_USER,
           coords: lat !== undefined && lng !== undefined ? { lat, lng } : undefined,
+          endDate,
           likes: 0, liked: false, comments: 0,
         });
         day.items.sort(byTime);
       }
     }
   },
-  async updateItem(itemId, { time, title, place, cat, url, lat, lng }) {
+  async updateItem(itemId, { time, title, place, cat, url, lat, lng, endDate }) {
     await wait();
     for (const days of Object.values(dayStore)) {
       for (const day of days) {
@@ -217,6 +219,7 @@ export const demoItineraryApi: ItineraryApi = {
           item.cat = cat;
           item.url = url;
           item.coords = lat !== undefined && lng !== undefined ? { lat, lng } : item.coords;
+          item.endDate = endDate;
           day.items.sort(byTime);
         }
       }

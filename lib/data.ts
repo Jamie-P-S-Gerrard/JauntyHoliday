@@ -87,7 +87,7 @@ export const DISCOVER: DiscoverData = {
 // Item times are minutes since midnight (e.g. 14:30 → 870); see lib/time.ts.
 export const DAYS: Day[] = [
   {
-    id: 'day1', n: 1, date: 'Oct 3', title: 'Land & settle', area: 'Kuta',
+    id: 'day1', n: 1, date: 'Oct 3', iso: '2026-10-03', title: 'Land & settle', area: 'Kuta',
     items: [
       { id: 'i1', time: 870,  title: 'Land at Lombok Intl (LOP)', place: 'Praya', cat: 'travel', who: 'j', coords: { lat: -8.7573, lng: 116.2767 }, likes: 0, liked: false, comments: 0 },
       { id: 'i2', time: 960,  title: 'Check in — Ashtari Villa', place: 'Kuta', cat: 'stay', who: 'c', coords: { lat: -8.9020, lng: 116.2755 }, likes: 1, liked: true, comments: 0 },
@@ -95,7 +95,7 @@ export const DAYS: Day[] = [
     ],
   },
   {
-    id: 'day2', n: 2, date: 'Oct 4', title: 'Beach day', area: 'Selong Belanak',
+    id: 'day2', n: 2, date: 'Oct 4', iso: '2026-10-04', title: 'Beach day', area: 'Selong Belanak',
     items: [
       { id: 'i4', time: 510,  title: 'Surf lesson for two', place: 'Selong Belanak', cat: 'beach', who: 'j', coords: { lat: -8.8676, lng: 116.2043 }, likes: 2, liked: true, comments: 0 },
       { id: 'i5', time: 780,  title: 'Warung lunch on the sand', place: 'Selong Belanak', cat: 'food', who: 'c', coords: { lat: -8.8668, lng: 116.2071 }, likes: 0, liked: false, comments: 0 },
@@ -103,18 +103,18 @@ export const DAYS: Day[] = [
     ],
   },
   {
-    id: 'day3', n: 3, date: 'Oct 5', title: 'Pink Beach', area: 'Sekotong',
+    id: 'day3', n: 3, date: 'Oct 5', iso: '2026-10-05', title: 'Pink Beach', area: 'Sekotong',
     items: [
       { id: 'i7', time: 450, title: 'Pink Beach snorkel trip', place: 'Sekotong', cat: 'beach', who: 'c', coords: { lat: -8.7845, lng: 116.0089 }, likes: 2, liked: true, comments: 0 },
     ],
   },
-  { id: 'day4', n: 4,  date: 'Oct 6',  title: 'South Gilis',  area: 'Gili Nanggu', items: [] },
-  { id: 'day5', n: 5,  date: 'Oct 7',  title: 'Drive north',  area: 'Senggigi',    items: [] },
-  { id: 'day6', n: 6,  date: 'Oct 8',  title: 'Waterfalls',   area: 'Senaru',      items: [] },
-  { id: 'day7', n: 7,  date: 'Oct 9',  title: 'Gili Air',     area: 'Gili Air',    items: [] },
-  { id: 'day8', n: 8,  date: 'Oct 10', title: 'Slow day',     area: 'Gili Air',    items: [] },
-  { id: 'day9', n: 9,  date: 'Oct 11', title: 'Back south',   area: 'Kuta',        items: [] },
-  { id: 'day10', n: 10, date: 'Oct 12', title: 'Fly home',     area: 'Praya',       items: [] },
+  { id: 'day4', n: 4,  date: 'Oct 6', iso: '2026-10-06',  title: 'South Gilis',  area: 'Gili Nanggu', items: [] },
+  { id: 'day5', n: 5,  date: 'Oct 7', iso: '2026-10-07',  title: 'Drive north',  area: 'Senggigi',    items: [] },
+  { id: 'day6', n: 6,  date: 'Oct 8', iso: '2026-10-08',  title: 'Waterfalls',   area: 'Senaru',      items: [] },
+  { id: 'day7', n: 7,  date: 'Oct 9', iso: '2026-10-09',  title: 'Gili Air',     area: 'Gili Air',    items: [] },
+  { id: 'day8', n: 8,  date: 'Oct 10', iso: '2026-10-10', title: 'Slow day',     area: 'Gili Air',    items: [] },
+  { id: 'day9', n: 9,  date: 'Oct 11', iso: '2026-10-11', title: 'Back south',   area: 'Kuta',        items: [] },
+  { id: 'day10', n: 10, date: 'Oct 12', iso: '2026-10-12', title: 'Fly home',     area: 'Praya',       items: [] },
 ];
 
 export const SIDE_TRIPS: SideTrip[] = [
