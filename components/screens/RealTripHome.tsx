@@ -7,7 +7,8 @@ import { Sheet } from '@/components/ui/Sheet';
 import { Placeholder } from '@/components/ui/Placeholder';
 import { ChatSheet } from '@/components/ui/ChatSheet';
 import { TripPhotos } from './TripPhotos';
-import type { AppTab, ChatApi, Day, ItineraryApi, PhotosApi, Stay, StaysApi, StayStatus } from '@/types';
+import { TripDocuments } from './TripDocuments';
+import type { AppTab, ChatApi, Day, DocsApi, ItineraryApi, PhotosApi, Stay, StaysApi, StayStatus } from '@/types';
 
 const STATUS_META: Record<StayStatus, { label: string; cls: string }> = {
   todo:    { label: 'Idea',    cls: 'gold' },
@@ -31,19 +32,21 @@ interface RealTripHomeProps {
   itinApi: ItineraryApi;
   chatApi: ChatApi;
   photosApi: PhotosApi;
+  docsApi: DocsApi;
   onSwitch: () => void;
   go: (tab: AppTab) => void;
 }
 
 export function RealTripHome({
   groupName, dest, when, tint, members, tripId, groupId, userId,
-  staysApi, itinApi, chatApi, photosApi, onSwitch, go,
+  staysApi, itinApi, chatApi, photosApi, docsApi, onSwitch, go,
 }: RealTripHomeProps) {
   const [stays, setStays] = useState<Stay[]>([]);
   const [days, setDays] = useState<Day[]>([]);
   const [addStayOpen, setAddStayOpen] = useState(false);
   const [editStay, setEditStay] = useState<Stay | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
+  const [attachStayId, setAttachStayId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const reload = useCallback(async () => {
@@ -162,6 +165,14 @@ export function RealTripHome({
                 >
                   {STATUS_META[s.status].label}
                 </button>
+                <button
+                  onClick={() => setAttachStayId(s.id)}
+                  aria-label={'Attach confirmation to ' + s.title}
+                  title="Attach a booking confirmation"
+                  style={{ opacity: 0.55, padding: 2 }}
+                >
+                  <Icon name="paperclip" size={13} color="var(--ink-soft)" />
+                </button>
                 {s.who === userId && (
                   <button onClick={() => run(() => staysApi.remove(s.id))} aria-label="Remove stay" style={{ opacity: 0.45, padding: 2 }}>
                     <Icon name="x" size={13} color="var(--ink-soft)" />
@@ -195,6 +206,18 @@ export function RealTripHome({
             <p className="hdr-sub">Set your dates and start filling the days.</p>
           </button>
         )}
+
+        {/* Booking confirmations — PDFs/images, tagged with who they cover */}
+        <TripDocuments
+          tripId={tripId}
+          groupId={groupId}
+          userId={userId}
+          members={members}
+          api={docsApi}
+          stayNames={Object.fromEntries(stays.map((s) => [s.id, s.title]))}
+          attachStayId={attachStayId}
+          onAttachHandled={() => setAttachStayId(null)}
+        />
 
         {/* Shared photo gallery — private to the group */}
         <TripPhotos tripId={tripId} groupId={groupId} userId={userId} api={photosApi} />

@@ -161,6 +161,33 @@ export interface PhotosApi {
   remove(photoId: string): Promise<void>;
 }
 
+// ── Booking documents: confirmations (PDFs/images) shared with the group ─────
+
+export interface TripDoc {
+  id: string;
+  name: string;
+  /** Short-lived signed URL (Supabase) or object URL (demo). */
+  url: string;
+  mime?: string;
+  /** Who the booking covers; empty array = the whole group. */
+  memberIds: UserId[];
+  stayId?: string;
+  who: UserId;
+  at: string;
+}
+
+export interface DocInput {
+  name: string;
+  memberIds: UserId[];
+  stayId?: string;
+}
+
+export interface DocsApi {
+  list(tripId: string): Promise<TripDoc[]>;
+  add(tripId: string, groupId: string, file: File, input: DocInput): Promise<void>;
+  remove(docId: string): Promise<void>;
+}
+
 // ── Chat: message threads on a trip or an event ───────────────────────────────
 
 export interface ChatMsg {

@@ -9,7 +9,7 @@ import type {
   DateOption, DatesApi, BoardItem, BoardApi,
   Day, ItineraryApi, Stay, StaysApi, StayStatus,
   GroupEvent, EventsApi, ChatApi, ChatMsg, EventPart, EventInput,
-  ChangeEntry, HistoryApi, PhotosApi, TripPhoto,
+  ChangeEntry, HistoryApi, PhotosApi, TripPhoto, DocsApi, TripDoc,
 } from '@/types';
 
 const TRIP_TINTS = ['#caa37a', '#7fa0c0', '#9aa56a', '#b07a9a', '#c77f6a', '#7fa39a'];
@@ -377,6 +377,85 @@ export const dbPhotosApi: PhotosApi = {
     if (deleteError) throw deleteError;
     // Best-effort: the row is the source of truth, orphaned objects are harmless
     await supabase.storage.from('trip-photos').remove([data.path]).catch(() => {});
+  },
+};
+
+// ── Booking documents ─────────────────────────────────────────────────────────
+
+// PDFs go up as-is; images are re-encoded (resized + EXIF stripped) like
+// photos. The docs bucket is private — reads use short-lived signed URLs and
+// storage policies restrict everything to the group's members.
+export const dbDocsApi: DocsApi = {
+  async list(tripId) {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from('trip_documents')
+      .select('id, name, path, mime, member_ids, stay_id, uploaded_by, created_at')
+      .eq('trip_id', tripId)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    if (!data || data.length === 0) return [];
+
+    const { data: signed, error: signError } = await supabase.storage
+      .from('docs')
+      .createSignedUrls(data.map((d) => d.path), 3600);
+    if (signError) throw signError;
+
+    return data.map((d, i): TripDoc => ({
+      id: d.id,
+      name: d.name,
+      url: signed?.[i]?.signedUrl ?? '',
+      mime: d.mime ?? undefined,
+      memberIds: d.member_ids ?? [],
+      stayId: d.stay_id ?? undefined,
+      who: d.uploaded_by ?? '',
+      at: d.created_at,
+    })).filter((d) => d.url);
+  },
+
+  async add(tripId, groupId, file, { name, memberIds, stayId }) {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not signed in');
+
+    const isPdf = file.type === 'application/pdf';
+    if (!isPdf && !file.type.startsWith('image/')) {
+      throw new Error('Choose a PDF or an image');
+    }
+    const blob = isPdf ? file : await prepareImage(file);
+    if (blob.size > 15 * 1024 * 1024) throw new Error('Keep files under 15MB');
+
+    const path = `${groupId}/${tripId}/${crypto.randomUUID()}.${isPdf ? 'pdf' : 'webp'}`;
+    const { error: uploadError } = await supabase.storage
+      .from('docs')
+      .upload(path, blob, { contentType: isPdf ? 'application/pdf' : 'image/webp' });
+    if (uploadError) throw uploadError;
+
+    const { error } = await supabase.from('trip_documents').insert({
+      trip_id: tripId,
+      group_id: groupId,
+      name: name.trim() || file.name,
+      path,
+      mime: isPdf ? 'application/pdf' : 'image/webp',
+      size_bytes: blob.size,
+      member_ids: memberIds,
+      stay_id: stayId ?? null,
+      uploaded_by: user.id,
+    });
+    if (error) throw error;
+  },
+
+  async remove(docId) {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from('trip_documents')
+      .select('path')
+      .eq('id', docId)
+      .single();
+    if (error) throw error;
+    const { error: deleteError } = await supabase.from('trip_documents').delete().eq('id', docId);
+    if (deleteError) throw deleteError;
+    await supabase.storage.from('docs').remove([data.path]).catch(() => {});
   },
 };
 

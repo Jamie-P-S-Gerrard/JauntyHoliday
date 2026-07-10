@@ -3,7 +3,7 @@
 import { dateRange, formatDayLabel, formatRange, formatSub } from './dates';
 import { byTime, timeFromHHMM } from './time';
 import { DAYS } from './data';
-import type { BoardApi, BoardItem, ChangeEntry, ChatApi, ChatMsg, ChatScope, DateOption, DatesApi, Day, EventsApi, GroupEvent, HistoryApi, ItineraryApi, PhotosApi, Stay, StaysApi, TripPhoto } from '@/types';
+import type { BoardApi, BoardItem, ChangeEntry, ChatApi, ChatMsg, ChatScope, DateOption, DatesApi, Day, DocsApi, EventsApi, GroupEvent, HistoryApi, ItineraryApi, PhotosApi, Stay, StaysApi, TripDoc, TripPhoto } from '@/types';
 
 const DEMO_USER = 'j';
 
@@ -125,6 +125,38 @@ export const demoPhotosApi: PhotosApi = {
     await wait();
     for (const key of Object.keys(photoStore)) {
       photoStore[key] = photoStore[key].filter((p) => p.id !== photoId);
+    }
+  },
+};
+
+// ── Booking documents (demo) ──────────────────────────────────────────────────
+
+const docStore: Record<string, TripDoc[]> = {};
+
+export const demoDocsApi: DocsApi = {
+  async list(tripId) {
+    await wait();
+    return [...(docStore[tripId] ?? [])];
+  },
+  async add(tripId, _groupId, file, { name, memberIds, stayId }) {
+    await wait();
+    const isPdf = file.type === 'application/pdf';
+    if (!isPdf && !file.type.startsWith('image/')) throw new Error('Choose a PDF or an image');
+    (docStore[tripId] ??= []).unshift({
+      id: `doc${Date.now()}`,
+      name: name.trim() || file.name,
+      url: URL.createObjectURL(file),
+      mime: file.type,
+      memberIds,
+      stayId,
+      who: DEMO_USER,
+      at: new Date().toISOString(),
+    });
+  },
+  async remove(docId) {
+    await wait();
+    for (const key of Object.keys(docStore)) {
+      docStore[key] = docStore[key].filter((d) => d.id !== docId);
     }
   },
 };

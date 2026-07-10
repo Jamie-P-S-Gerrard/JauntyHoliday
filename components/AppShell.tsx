@@ -20,11 +20,11 @@ import {
   fetchGroups, createGroupDb, joinGroupDb, createTripDb,
   markTripReadyDb, updateTripDb, savePrefsDb, dbDatesApi, dbBoardApi,
   dbItineraryApi, dbStaysApi, dbEventsApi, dbChatApi, dbHistoryApi,
-  dbPhotosApi, updateAvatarDb,
+  dbPhotosApi, dbDocsApi, updateAvatarDb,
 } from '@/lib/db';
 import {
   demoDatesApi, demoBoardApi, demoItineraryApi, demoStaysApi, demoEventsApi, demoChatApi, demoHistoryApi,
-  demoPhotosApi, updateAvatarDemo,
+  demoPhotosApi, demoDocsApi, updateAvatarDemo,
 } from '@/lib/demo-apis';
 import type { AppStage, AppTab, Group, GroupPrefs, TripSummary } from '@/types';
 
@@ -49,6 +49,7 @@ export function AppShell() {
   const chatApi = configured ? dbChatApi : demoChatApi;
   const historyApi = configured ? dbHistoryApi : demoHistoryApi;
   const photosApi = configured ? dbPhotosApi : demoPhotosApi;
+  const docsApi = configured ? dbDocsApi : demoDocsApi;
 
   const activeGroup = groups.find((g) => g.id === activeGroupId) ?? null;
   const activeTrip = activeGroup?.trips.find((t) => t.id === activeTripId) ?? null;
@@ -346,6 +347,7 @@ export function AppShell() {
                     itinApi={itinApi}
                     chatApi={chatApi}
                     photosApi={photosApi}
+                    docsApi={docsApi}
                     onSwitch={() => setStage('group')}
                     go={setTab}
                   />
