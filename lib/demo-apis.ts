@@ -191,7 +191,7 @@ export const demoItineraryApi: ItineraryApi = {
       items: [],
     }));
   },
-  async addItem(dayId, { time, title, place, cat, url, lat, lng, endDate }) {
+  async addItem(dayId, { time, title, place, cat, url, lat, lng, endDate, endTime }) {
     await wait();
     for (const days of Object.values(dayStore)) {
       const day = days.find((d) => d.id === dayId);
@@ -201,13 +201,14 @@ export const demoItineraryApi: ItineraryApi = {
           cat, who: DEMO_USER,
           coords: lat !== undefined && lng !== undefined ? { lat, lng } : undefined,
           endDate,
+          endTime: timeFromHHMM(endTime),
           likes: 0, liked: false, comments: 0,
         });
         day.items.sort(byTime);
       }
     }
   },
-  async updateItem(itemId, { time, title, place, cat, url, lat, lng, endDate }) {
+  async updateItem(itemId, { time, title, place, cat, url, lat, lng, endDate, endTime }) {
     await wait();
     for (const days of Object.values(dayStore)) {
       for (const day of days) {
@@ -220,6 +221,7 @@ export const demoItineraryApi: ItineraryApi = {
           item.url = url;
           item.coords = lat !== undefined && lng !== undefined ? { lat, lng } : item.coords;
           item.endDate = endDate;
+          item.endTime = timeFromHHMM(endTime);
           day.items.sort(byTime);
         }
       }

@@ -277,6 +277,8 @@ export interface ItineraryItem {
   coords?: LatLng;
   /** ISO date the range ends: check-out for stays, return for flights. */
   endDate?: string;
+  /** Minutes since midnight for the end of the range (check-out / return time). */
+  endTime?: number | null;
   likes: number;
   liked: boolean;
   comments: number;
@@ -305,6 +307,8 @@ export interface ItineraryItemInput {
   lng?: number;
   /** ISO date: check-out (stay) or return (travel). */
   endDate?: string;
+  /** "HH:mm" time for the end of the range (check-out / return time). */
+  endTime?: string;
 }
 
 export interface ItineraryApi {
